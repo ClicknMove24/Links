@@ -3264,32 +3264,7 @@
                 }
             }
             
-            // בדיקות זמן ודפוס נוספים
-            if (entry) {
-                // בדיקת זמן פעילות חשוד (שעות לילה)
-                if (entry.timestamp) {
-                    const hour = new Date(entry.timestamp).getHours();
-                    if (hour >= 2 && hour <= 5) {  // 02:00-05:00
-                        result.isSuspicious = true;
-                        result.reason = 'Late Night Activity (Suspicious)';
-                        result.confidence = 40;
-                    }
-                }
-                
-                // בדיקת פרמטרים חשודים
-                if (entry.query_params && entry.query_params.fbclid) {
-                    const fbclid = entry.query_params.fbclid;
-                    // פרמטרי פייסבוק מהרשתות הבוט
-                    if (fbclid.includes('YnJpZBExbWM1Rjk4NW') || 
-                        fbclid.includes('YnJpZBExRjU4') ||
-                        fbclid.includes('c3J0YwZhcHBfaWQ')) {
-                        result.isBot = true;
-                        result.reason = 'Suspicious Facebook Click ID Pattern';
-                        result.confidence = 85;
-                        return result;
-                    }
-                }
-            }
+            // הערה: בדיקות זמן ו-fbclid מתבצעות בפונקציה analyzeComplexLogEntry
             
             // דפוסי IP חשודים נוספים
             // IP עם יותר מדי zeros (דפוס בוטים)
