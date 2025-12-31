@@ -426,10 +426,25 @@
             <button class="button" onclick="downloadCSVReport()" style="background: linear-gradient(45deg, #2196F3, #42A5F5);">📊 הורד דוח CSV</button>
             <button class="button" onclick="clearAllData()" style="background: linear-gradient(45deg, #f44336, #ef5350);">🗑️ נקה נתונים</button>
             <button class="button" onclick="showDataSummary()" style="background: linear-gradient(45deg, #FF9800, #FFB74D);">📋 סיכום נתונים</button>
+            
+            <!-- העלאת קובץ לוגים -->
+            <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 10px;">
+                <h4 style="color: #ffd700; margin-bottom: 10px;">📂 ניתוח לוגים</h4>
+                <input type="file" id="logsFileInput" accept=".json" style="display: none;" onchange="handleLogsUpload(event)">
+                <button class="button" onclick="document.getElementById('logsFileInput').click()" style="background: linear-gradient(45deg, #9C27B0, #BA68C8);">📤 העלה קובץ JSON</button>
+                <button class="button" onclick="analyzeUploadedLogs()" style="background: linear-gradient(45deg, #607D8B, #78909C);" id="analyzeBtn" disabled>🔍 נתח לוגים</button>
+                <div id="uploadStatus" style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;"></div>
+            </div>
         </div>
         
         <!-- אזהרות -->
         <div id="warnings-container"></div>
+        
+        <!-- תוצאות ניתוח לוגים -->
+        <div id="logsAnalysisResults" style="display: none; margin-top: 20px; padding: 20px; background: rgba(255,255,255,0.1); border-radius: 15px;">
+            <h3 style="color: #ffd700; margin-bottom: 20px;">📊 תוצאות ניתוח הלוגים</h3>
+            <div id="analysisContent"></div>
+        </div>
     </div>
 
     <script>
@@ -451,6 +466,9 @@
         // מערכת מעקב משתמשים בזמן אמת
         let activeVisitors = new Map();
         let lastHeartbeat = Date.now();
+        
+        // נתוני לוגים שהועלו
+        let uploadedLogs = null;
         let behaviorAnalysis = {
             mouseMovements: [],
             clicks: [],
@@ -2386,6 +2404,507 @@
             
             console.log('🚀 מערכת זיהוי בוטים מתקדמת הופעלה בהצלחה!');
         };
+
+        // =========== פונקציות ניתוח לוגים ===========
+
+        // טיפול בהעלאת קובץ
+        function handleLogsUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.innerHTML = '📤 מעלה קובץ...';
+
+            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                statusDiv.innerHTML = '❌ שגיאה: יש להעלות קובץ JSON בלבד';
+                statusDiv.style.color = '#f44336';
+                return;
+            }
+
+            if (file.size > 50 * 1024 * 1024) { // 50MB limit
+                statusDiv.innerHTML = '❌ שגיאה: קובץ גדול מדי (מקסימום 50MB)';
+                statusDiv.style.color = '#f44336';
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const jsonData = JSON.parse(e.target.result);
+                    uploadedLogs = jsonData;
+                    
+                    statusDiv.innerHTML = `✅ הועלה בהצלחה: ${file.name} (${formatFileSize(file.size)})`;
+                    statusDiv.style.color = '#4CAF50';
+                    
+                    // הפעלת כפתור הניתוח
+                    document.getElementById('analyzeBtn').disabled = false;
+                    
+                    console.log('📂 Logs uploaded:', Object.keys(jsonData).length, 'entries');
+                    
+                } catch (error) {
+                    statusDiv.innerHTML = '❌ שגיאה: קובץ JSON לא תקין';
+                    statusDiv.style.color = '#f44336';
+                    console.error('JSON parse error:', error);
+                }
+            };
+            
+            reader.onerror = function() {
+                statusDiv.innerHTML = '❌ שגיאה בקריאת הקובץ';
+                statusDiv.style.color = '#f44336';
+            };
+            
+            reader.readAsText(file);
+        }
+
+        // פורמט גודל קובץ
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // ניתוח הלוגים שהועלו
+        function analyzeUploadedLogs() {
+            if (!uploadedLogs) {
+                alert('❌ לא הועלה קובץ לניתוח');
+                return;
+            }
+
+            const analysisDiv = document.getElementById('logsAnalysisResults');
+            const contentDiv = document.getElementById('analysisContent');
+            
+            analysisDiv.style.display = 'block';
+            contentDiv.innerHTML = '🔄 מנתח נתונים...';
+
+            // המתנה קצרה לאפקט ויזואלי
+            setTimeout(() => {
+                try {
+                    const analysisResults = performLogsAnalysis(uploadedLogs);
+                    displayAnalysisResults(analysisResults);
+                } catch (error) {
+                    contentDiv.innerHTML = `❌ שגיאה בניתוח: ${error.message}`;
+                    console.error('Analysis error:', error);
+                }
+            }, 500);
+        }
+
+        // ביצוע הניתוח
+        function performLogsAnalysis(logs) {
+            console.log('🔍 Starting logs analysis...');
+            
+            // זיהוי מבנה הנתונים
+            const dataStructure = identifyDataStructure(logs);
+            
+            // ניתוח על פי מבנה הנתונים
+            if (dataStructure.type === 'array') {
+                return analyzeArrayLogs(logs, dataStructure);
+            } else if (dataStructure.type === 'object') {
+                return analyzeObjectLogs(logs, dataStructure);
+            } else {
+                throw new Error('מבנה נתונים לא נתמך');
+            }
+        }
+
+        // זיהוי מבנה הנתונים
+        function identifyDataStructure(data) {
+            if (Array.isArray(data)) {
+                if (data.length > 0) {
+                    const sample = data[0];
+                    return {
+                        type: 'array',
+                        sampleKeys: Object.keys(sample),
+                        length: data.length
+                    };
+                }
+                return { type: 'array', length: 0 };
+            } else if (typeof data === 'object') {
+                return {
+                    type: 'object',
+                    keys: Object.keys(data),
+                    hasEvents: data.events && Array.isArray(data.events)
+                };
+            }
+            return { type: 'unknown' };
+        }
+
+        // ניתוח נתוני array
+        function analyzeArrayLogs(logs, structure) {
+            let botCount = 0;
+            let humanCount = 0;
+            let unknownCount = 0;
+            let totalClicks = 0;
+            let suspiciousActivities = 0;
+
+            const deviceTypes = {};
+            const userAgents = {};
+            const ipAddresses = {};
+            const timeDistribution = {};
+            const sources = {};
+            const detectionMethods = {};
+
+            logs.forEach((entry, index) => {
+                try {
+                    const analysis = analyzeLogEntry(entry, index);
+                    
+                    if (analysis.isBot) {
+                        botCount++;
+                    } else if (analysis.isHuman) {
+                        humanCount++;
+                    } else {
+                        unknownCount++;
+                    }
+
+                    if (analysis.isClick) totalClicks++;
+                    if (analysis.isSuspicious) suspiciousActivities++;
+
+                    // איסוף סטטיסטיקות
+                    if (analysis.deviceType) {
+                        deviceTypes[analysis.deviceType] = (deviceTypes[analysis.deviceType] || 0) + 1;
+                    }
+                    
+                    if (analysis.userAgent) {
+                        const shortUA = analysis.userAgent.substring(0, 50);
+                        userAgents[shortUA] = (userAgents[shortUA] || 0) + 1;
+                    }
+                    
+                    if (analysis.ip) {
+                        ipAddresses[analysis.ip] = (ipAddresses[analysis.ip] || 0) + 1;
+                    }
+                    
+                    if (analysis.timestamp) {
+                        const hour = new Date(analysis.timestamp).getHours();
+                        timeDistribution[hour] = (timeDistribution[hour] || 0) + 1;
+                    }
+                    
+                    if (analysis.source) {
+                        sources[analysis.source] = (sources[analysis.source] || 0) + 1;
+                    }
+
+                    if (analysis.detectionMethods) {
+                        analysis.detectionMethods.forEach(method => {
+                            detectionMethods[method] = (detectionMethods[method] || 0) + 1;
+                        });
+                    }
+
+                } catch (error) {
+                    console.warn(`Error analyzing entry ${index}:`, error);
+                    unknownCount++;
+                }
+            });
+
+            const totalEntries = logs.length;
+            const botPercentage = ((botCount / totalEntries) * 100).toFixed(1);
+            const humanPercentage = ((humanCount / totalEntries) * 100).toFixed(1);
+
+            return {
+                summary: {
+                    totalEntries,
+                    botCount,
+                    humanCount,
+                    unknownCount,
+                    totalClicks,
+                    suspiciousActivities,
+                    botPercentage,
+                    humanPercentage,
+                    botToHumanRatio: humanCount > 0 ? (botCount / humanCount).toFixed(2) : 'N/A'
+                },
+                distributions: {
+                    deviceTypes,
+                    userAgents,
+                    ipAddresses,
+                    timeDistribution,
+                    sources,
+                    detectionMethods
+                },
+                recommendations: generateRecommendations(botCount, humanCount, totalEntries)
+            };
+        }
+
+        // ניתוח נתוני object
+        function analyzeObjectLogs(logs, structure) {
+            if (structure.hasEvents) {
+                return analyzeArrayLogs(logs.events, { type: 'array', length: logs.events.length });
+            }
+            
+            // ניתוח object כללי
+            const keys = Object.keys(logs);
+            return {
+                summary: {
+                    totalEntries: keys.length,
+                    dataType: 'object',
+                    mainKeys: keys.slice(0, 10)
+                },
+                message: 'מבנה נתונים לא סטנדרטי - נדרש ניתוח ידני'
+            };
+        }
+
+        // ניתוח רשומה בודדת
+        function analyzeLogEntry(entry, index) {
+            const result = {
+                isBot: false,
+                isHuman: false,
+                isClick: false,
+                isSuspicious: false,
+                botScore: 0,
+                deviceType: null,
+                userAgent: null,
+                ip: null,
+                timestamp: null,
+                source: null,
+                detectionMethods: []
+            };
+
+            // זיהוי שדות נפוצים
+            const possibleFields = {
+                userAgent: ['user_agent', 'userAgent', 'ua', 'User-Agent'],
+                ip: ['ip', 'ip_address', 'client_ip', 'remote_addr'],
+                timestamp: ['timestamp', 'time', 'date', 'created_at'],
+                botScore: ['bot_score', 'botScore', 'bot_detection_score'],
+                isBot: ['is_bot', 'isBot', 'bot'],
+                source: ['source', 'referrer', 'utm_source'],
+                type: ['type', 'event_type', 'action']
+            };
+
+            // חילוץ נתונים
+            for (const [key, possibleNames] of Object.entries(possibleFields)) {
+                for (const name of possibleNames) {
+                    if (entry[name] !== undefined) {
+                        result[key] = entry[name];
+                        break;
+                    }
+                }
+            }
+
+            // הסקת מסקנות
+            if (result.isBot === true || result.botScore > 70) {
+                result.isBot = true;
+                result.detectionMethods.push('Explicit Bot Flag');
+            } else if (result.isBot === false || result.botScore < 30) {
+                result.isHuman = true;
+                result.detectionMethods.push('Explicit Human Flag');
+            }
+
+            // ניתוח User Agent
+            if (result.userAgent) {
+                const ua = result.userAgent.toLowerCase();
+                const botKeywords = ['bot', 'crawler', 'spider', 'scraper', 'headless'];
+                if (botKeywords.some(keyword => ua.includes(keyword))) {
+                    result.isBot = true;
+                    result.detectionMethods.push('User Agent Analysis');
+                }
+            }
+
+            // זיהוי סוג אירוע
+            if (result.type) {
+                const type = result.type.toLowerCase();
+                if (type.includes('click')) {
+                    result.isClick = true;
+                }
+                if (type.includes('suspicious') || type.includes('warning')) {
+                    result.isSuspicious = true;
+                }
+            }
+
+            // ניתוח זמן
+            if (result.timestamp) {
+                try {
+                    const date = new Date(result.timestamp);
+                    result.timestamp = date.toISOString();
+                } catch (e) {
+                    // ניסוי פרס timestamp כמספר
+                    if (typeof result.timestamp === 'number') {
+                        result.timestamp = new Date(result.timestamp).toISOString();
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // יצירת המלצות
+        function generateRecommendations(botCount, humanCount, totalEntries) {
+            const recommendations = [];
+            const botRatio = botCount / totalEntries;
+
+            if (botRatio > 0.5) {
+                recommendations.push('🚨 זיהוי רמת בוטים גבוהה מאוד - נדרש חקירה מיידית');
+                recommendations.push('🛡️ הקמת מערכת הגנה חזקה יותר');
+            } else if (botRatio > 0.3) {
+                recommendations.push('⚠️ רמת בוטים גבוהה - מומלץ לחזק את מערכת הזיהוי');
+            } else if (botRatio > 0.1) {
+                recommendations.push('✅ רמת בוטים תקינה - המשך מעקב');
+            } else {
+                recommendations.push('🎉 רמת בוטים נמוכה מאוד - מערכת יעילה');
+            }
+
+            if (humanCount === 0) {
+                recommendations.push('🤔 לא זוהו משתמשים אנושיים - בדוק את מערכת הזיהוי');
+            }
+
+            return recommendations;
+        }
+
+        // הצגת תוצאות הניתוח
+        function displayAnalysisResults(results) {
+            const contentDiv = document.getElementById('analysisContent');
+            
+            let html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    
+                    <!-- סיכום כללי -->
+                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                        <h4 style="color: #4CAF50; margin-bottom: 15px;">📊 סיכום כללי</h4>
+                        <div style="text-align: right;">
+                            <div>📈 סה"כ רשומות: <strong>${results.summary.totalEntries.toLocaleString()}</strong></div>
+                            <div>🤖 בוטים: <strong>${results.summary.botCount.toLocaleString()}</strong> (${results.summary.botPercentage}%)</div>
+                            <div>👥 בני אדם: <strong>${results.summary.humanCount.toLocaleString()}</strong> (${results.summary.humanPercentage}%)</div>
+                            <div>❓ לא ברור: <strong>${results.summary.unknownCount.toLocaleString()}</strong></div>
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+                                <div>👆 סה"כ קליקים: <strong>${results.summary.totalClicks.toLocaleString()}</strong></div>
+                                <div>⚠️ פעילויות חשודות: <strong>${results.summary.suspiciousActivities.toLocaleString()}</strong></div>
+                                <div>⚖️ יחס בוט:אדם = <strong>1:${results.summary.botToHumanRatio}</strong></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- גרף עוגה -->
+                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                        <h4 style="color: #FF9800; margin-bottom: 15px;">🥧 התפלגות</h4>
+                        <div style="position: relative; height: 200px;">
+                            ${createPieChart(results.summary)}
+                        </div>
+                    </div>
+            `;
+
+            // הוספת התפלגויות אם קיימות
+            if (results.distributions) {
+                // מכשירים
+                if (Object.keys(results.distributions.deviceTypes).length > 0) {
+                    html += `
+                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                            <h4 style="color: #2196F3; margin-bottom: 15px;">📱 סוגי מכשירים</h4>
+                            ${createDistributionList(results.distributions.deviceTypes)}
+                        </div>
+                    `;
+                }
+
+                // User Agents מובילים
+                if (Object.keys(results.distributions.userAgents).length > 0) {
+                    html += `
+                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                            <h4 style="color: #9C27B0; margin-bottom: 15px;">🌐 User Agents מובילים</h4>
+                            ${createDistributionList(results.distributions.userAgents, 5)}
+                        </div>
+                    `;
+                }
+
+                // התפלגות זמן
+                if (Object.keys(results.distributions.timeDistribution).length > 0) {
+                    html += `
+                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
+                            <h4 style="color: #607D8B; margin-bottom: 15px;">🕐 התפלגות לפי שעות</h4>
+                            ${createTimeDistribution(results.distributions.timeDistribution)}
+                        </div>
+                    `;
+                }
+            }
+
+            // המלצות
+            if (results.recommendations && results.recommendations.length > 0) {
+                html += `
+                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; grid-column: 1 / -1;">
+                        <h4 style="color: #FFC107; margin-bottom: 15px;">💡 המלצות</h4>
+                        <ul style="text-align: right; list-style: none; padding: 0;">
+                `;
+                
+                results.recommendations.forEach(rec => {
+                    html += `<li style="margin: 10px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 5px;">${rec}</li>`;
+                });
+                
+                html += `
+                        </ul>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+            
+            contentDiv.innerHTML = html;
+            
+            console.log('✅ Analysis complete:', results);
+        }
+
+        // יצירת עוגה פשוטה (CSS)
+        function createPieChart(summary) {
+            const total = summary.botCount + summary.humanCount + summary.unknownCount;
+            if (total === 0) return '<div>אין נתונים להצגה</div>';
+
+            const botPerc = (summary.botCount / total) * 100;
+            const humanPerc = (summary.humanCount / total) * 100;
+            
+            return `
+                <div style="text-align: center;">
+                    <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(
+                        #f44336 0% ${botPerc}%, 
+                        #4CAF50 ${botPerc}% ${botPerc + humanPerc}%, 
+                        #9E9E9E ${botPerc + humanPerc}% 100%
+                    ); margin: 0 auto 20px;"></div>
+                    <div style="font-size: 0.9em;">
+                        <div style="color: #f44336;">🤖 בוטים: ${summary.botCount}</div>
+                        <div style="color: #4CAF50;">👥 בני אדם: ${summary.humanCount}</div>
+                        <div style="color: #9E9E9E;">❓ לא ברור: ${summary.unknownCount}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // יצירת רשימת התפלגות
+        function createDistributionList(distribution, limit = 10) {
+            const entries = Object.entries(distribution)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, limit);
+            
+            let html = '<div style="text-align: right;">';
+            entries.forEach(([key, count]) => {
+                const percentage = Object.values(distribution).reduce((a, b) => a + b, 0);
+                const perc = ((count / percentage) * 100).toFixed(1);
+                html += `
+                    <div style="display: flex; justify-content: space-between; margin: 8px 0; padding: 5px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                        <span><strong>${count}</strong> (${perc}%)</span>
+                        <span style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${key}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        // יצירת התפלגות זמן
+        function createTimeDistribution(timeDistribution) {
+            let html = '<div style="text-align: right;">';
+            
+            for (let hour = 0; hour < 24; hour++) {
+                const count = timeDistribution[hour] || 0;
+                const maxCount = Math.max(...Object.values(timeDistribution));
+                const width = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                
+                html += `
+                    <div style="display: flex; align-items: center; margin: 3px 0;">
+                        <span style="width: 40px; text-align: left;">${count}</span>
+                        <div style="flex: 1; background: rgba(255,255,255,0.1); margin: 0 10px; border-radius: 3px; height: 20px; position: relative;">
+                            <div style="background: #4CAF50; width: ${width}%; height: 100%; border-radius: 3px;"></div>
+                        </div>
+                        <span style="width: 50px; text-align: right;">${hour}:00</span>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            return html;
+        }
     </script>
 </body>
 </html>
