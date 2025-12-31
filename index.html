@@ -2862,6 +2862,8 @@
             let totalBots = 0;
             let totalHumans = 0; 
             let totalClicks = 0;
+            let humanClicks = 0;
+            let botClicks = 0;
             let totalNonClicks = 0;
             let phoneNumbers = new Set();
             let suspiciousActivities = 0;
@@ -2904,9 +2906,11 @@
                             
                             if (finalResult.isBot) {
                                 totalBots++;
+                                botClicks++;
                                 phoneNumberStats[phoneNumber].bots++;
                             } else if (finalResult.isHuman) {
                                 totalHumans++;
+                                humanClicks++;
                                 phoneNumberStats[phoneNumber].humans++;
                             }
                             
@@ -2970,6 +2974,8 @@
                     totalPhoneNumbers: phoneNumbers.size,
                     totalEntries: totalEntries,
                     totalClicks: totalClicks,
+                    humanClicks: humanClicks,
+                    botClicks: botClicks,
                     totalNonClicks: totalNonClicks,
                     botCount: totalBots,
                     humanCount: totalHumans,
@@ -4141,17 +4147,17 @@
                             <div style="font-size: 2em; font-weight: bold; color: #4ecdc4;">${results.summary.humanCount.toLocaleString()}</div>
                             <div style="opacity: 0.9;">בני אדם שנכנסו (${(results.summary.humanRatio || 0)}%)</div>
                         </div>
-                        ${results.summary.totalClicks !== undefined ? `
+                        ${results.summary.humanClicks !== undefined ? `
                         <div style="border: 3px solid #ffd93d; border-radius: 10px; padding: 10px; background: rgba(255, 211, 61, 0.1);">
-                            <div style="font-size: 2em; font-weight: bold; color: #ffd93d;">${results.summary.totalClicks.toLocaleString()}</div>
-                            <div style="opacity: 0.9; font-weight: bold;">✅ לחצו על WhatsApp/טלפון</div>
+                            <div style="font-size: 2em; font-weight: bold; color: #ffd93d;">${results.summary.humanClicks.toLocaleString()}</div>
+                            <div style="opacity: 0.9; font-weight: bold;">✅ לחצו על WhatsApp/טלפון (אמיתיים)</div>
                         </div>
                         ` : ''}
                     </div>
                 </div>
 
                 <!-- השוואת בוטים מול בני אדם -->
-                ${results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined ? `
+                ${results.summary.humanClicks !== undefined && results.summary.totalNonClicks !== undefined ? `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                     
                     <!-- ניתוח בוטים -->
@@ -4411,18 +4417,18 @@
             csv += `בוטים,${results.summary.botCount},${results.summary.botRatio}%\n`;
             csv += `בני אדם שנכנסו,${results.summary.humanCount},${results.summary.humanRatio}%\n`;
             
-            if (results.summary.totalClicks !== undefined) {
-                csv += `לחצו על WhatsApp/טלפון,${results.summary.totalClicks},פעולות אמיתיות\n`;
+            if (results.summary.humanClicks !== undefined) {
+                csv += `לחצו על WhatsApp/טלפון,${results.summary.humanClicks},פעולות אמיתיות (ללא בוטים)\n`;
             }
             
             if (results.summary.totalNonClicks !== undefined) {
                 csv += `צפו בתוכן אבל עזבו,${results.summary.totalNonClicks},לא ביצעו פעולה\n`;
             }
 
-            // שיעור המרה
-            if (results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined) {
-                const conversionRate = ((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
-                csv += `שיעור המרה,${conversionRate}%,מתוך כל מי שנכנס לעמוד\n`;
+            // שיעור המרה (רק בני אדם אמיתיים)
+            if (results.summary.humanClicks !== undefined && results.summary.totalNonClicks !== undefined) {
+                const conversionRate = ((results.summary.humanClicks / (results.summary.humanClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
+                csv += `שיעור המרה אמיתי,${conversionRate}%,מתוך בני אדם אמיתיים בלבד\n`;
             }
 
             // נתוני מספרי טלפון
@@ -4459,18 +4465,18 @@
             summary += `• בוטים זוהו: ${results.summary.botCount.toLocaleString()} (${results.summary.botRatio}%)\n`;
             summary += `• בני אדם שנכנסו: ${results.summary.humanCount.toLocaleString()} (${results.summary.humanRatio}%)\n`;
             
-            if (results.summary.totalClicks !== undefined) {
-                summary += `• ✅ לחצו על WhatsApp/טלפון: ${results.summary.totalClicks.toLocaleString()}\n`;
+            if (results.summary.humanClicks !== undefined) {
+                summary += `• ✅ לחצו על WhatsApp/טלפון: ${results.summary.humanClicks.toLocaleString()} (אמיתיים בלבד)\n`;
             }
             
             if (results.summary.totalNonClicks !== undefined) {
                 summary += `• ❌ צפו בתוכן אבל עזבו: ${results.summary.totalNonClicks.toLocaleString()}\n`;
             }
 
-            // שיעור המרה
-            if (results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined) {
-                const conversionRate = ((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
-                summary += `• 📈 שיעור המרה: ${conversionRate}% (מתוך כל מי שנכנס לעמוד)\n`;
+            // שיעור המרה אמיתי
+            if (results.summary.humanClicks !== undefined && results.summary.totalNonClicks !== undefined) {
+                const conversionRate = ((results.summary.humanClicks / (results.summary.humanClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
+                summary += `• 📈 שיעור המרה אמיתי: ${conversionRate}% (רק בני אדם אמיתיים)\n`;
                 
                 // נתונים נוספים
                 summary += `\n🔍 ניתוח התנהגות:\n`;
@@ -4511,7 +4517,7 @@
 
         // פונקציות עזר לחישוב נתונים אמיתיים (ללא בוטים)
         function calculateRealConversionData(summary) {
-            return summary.totalClicks !== undefined && summary.totalNonClicks !== undefined && summary.humanCount > 0;
+            return summary.humanClicks !== undefined && summary.totalNonClicks !== undefined && summary.humanCount > 0;
         }
 
         function calculateRealConversionRate(summary) {
@@ -4528,8 +4534,8 @@
         }
 
         function getHumanClicks(summary) {
-            // מניח שכל הקליקים הם של בני אדם (בוטים בדרך כלל לא לוחצים על כפתורים אמיתיים)
-            return summary.totalClicks || 0;
+            // מחזיר את מספר הקליקים האמיתיים של בני אדם בלבד (ללא בוטים)
+            return summary.humanClicks || 0;
         }
 
         function getHumanNonClicks(summary) {
