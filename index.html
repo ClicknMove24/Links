@@ -1524,7 +1524,7 @@
                 detectAdvancedBot();
             }, 100);
             
-            alert('🖱️ לחיצה נרשמה! בודק מחדש ציון בוט...');
+            showClosablePopup('🖱️ לחיצה נרשמה! בודק מחדש ציון בוט...');
         }
         
         function trackMouseMovement() {
@@ -1541,7 +1541,7 @@
             };
             
             document.addEventListener('mousemove', handler);
-            alert('מעקב אחרי העכבר הופעל! זוז את העכבר וראה שזה נרשם במערכת שלנו');
+            showClosablePopup('מעקב אחרי העכבר הופעל! זוז את העכבר וראה שזה נרשם במערכת שלנו');
             
             setTimeout(() => {
                 document.removeEventListener('mousemove', handler);
@@ -1549,7 +1549,7 @@
                 // בדיקה מחדש של ציון בוט אחרי פעילות עכבר
                 detectAdvancedBot();
                 
-                alert(`נרשמו ${mouseMoveCount} תנועות עכבר! מעדכן ציון בוט...`);
+                showClosablePopup(`נרשמו ${mouseMoveCount} תנועות עכבר! מעדכן ציון בוט...`);
             }, 10000);
         }
         
@@ -1566,16 +1566,16 @@
             };
             
             window.addEventListener('scroll', handler);
-            alert('מעקב אחרי הגלילה הופעל! תגלול כדי לראות שזה נרשם');
+            showClosablePopup('מעקב אחרי הגלילה הופעל! תגלול כדי לראות שזה נרשם');
             
             setTimeout(() => {
                 window.removeEventListener('scroll', handler);
-                alert(`נרשמו ${scrollCount} גלילות במערכת שלנו`);
+                showClosablePopup(`נרשמו ${scrollCount} גלילות במערכת שלנו`);
             }, 10000);
         }
         
         function startAdvancedBehaviorTest() {
-            alert('🧪 מתחיל בדיקת התנהגות מתקדמת...\n\nבצע את הפעולות הבאות:\n• זוז את העכבר בדפוס טבעי\n• לחץ על מקומות שונים בדף\n• גלול למעלה ולמטה\n\nהבדיקה תימשך 15 שניות...');
+            showClosablePopup('🧪 מתחיל בדיקת התנהגות מתקדמת...<br><br>בצע את הפעולות הבאות:<br>• זוז את העכבר בדפוס טבעי<br>• לחץ על מקומות שונים בדף<br>• גלול למעלה ולמטה<br><br>הבדיקה תימשך 15 שניות...');
             
             // איפוס נתוני הבדיקה
             behaviorAnalysis.mouseMovements = [];
@@ -1662,7 +1662,7 @@
                     'scrolls': behaviorAnalysis.scrollEvents.length
                 });
                 
-                alert(message);
+                showClosablePopup(message);
                 
                 // עדכון ציון הבוט עם התוצאות החדשות
                 setTimeout(() => {
@@ -1707,7 +1707,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            alert('📥 דוח JSON הורד בהצלחה!');
+            showClosablePopup('📥 דוח JSON הורד בהצלחה!');
         }
         
         function downloadCSVReport() {
@@ -1715,7 +1715,7 @@
             const analyticsData = data ? JSON.parse(data) : [];
             
             if (analyticsData.length === 0) {
-                alert('❌ אין נתונים להורדה');
+                showClosablePopup('❌ אין נתונים להורדה');
                 return;
             }
             
@@ -1748,7 +1748,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            alert('📊 דוח CSV הורד בהצלחה!');
+            showClosablePopup('📊 דוח CSV הורד בהצלחה!');
         }
         
         // Original getSourceFromEvent function removed - duplicate
@@ -1774,7 +1774,7 @@
                 updateSourceDisplay();
                 updateTimelineDisplay();
                 
-                alert('🗑️ כל הנתונים נמחקו בהצלחה!');
+                showClosablePopup('🗑️ כל הנתונים נמחקו בהצלחה!');
                 setTimeout(() => window.location.reload(), 1000);
             }
         }
@@ -1784,7 +1784,7 @@
             const analyticsData = data ? JSON.parse(data) : [];
             
             if (analyticsData.length === 0) {
-                alert('📋 אין נתונים לסיכום');
+                showClosablePopup('📋 אין נתונים לסיכום');
                 return;
             }
             
@@ -1826,7 +1826,7 @@
             
             summary += '\n💾 נתונים נשמרו ב-localStorage';
             
-            alert(summary);
+            showClosablePopup(summary);
         }
 
         // קבלת מקור מאירוע
@@ -2577,7 +2577,7 @@
         // ניתוח הלוגים שהועלו
         function analyzeUploadedLogs() {
             if (!uploadedLogs) {
-                alert('❌ לא הועלה קובץ לניתוח');
+                showClosablePopup('❌ לא הועלה קובץ לניתוח');
                 return;
             }
 
@@ -3265,6 +3265,31 @@
             result.reason = 'Unknown IP Origin';
             result.confidence = 30;
             return result;
+        }
+        
+        // פופ-אפ נסגר
+        function showClosablePopup(message) {
+            // הסרת פופ-אפ קיים אם יש
+            const existingPopup = document.querySelector('.closeable-popup');
+            if (existingPopup) {
+                existingPopup.remove();
+            }
+            
+            const popup = document.createElement('div');
+            popup.className = 'closeable-popup';
+            popup.innerHTML = `
+                <button class="close-btn" onclick="this.parentElement.remove()">×</button>
+                <div>${message}</div>
+            `;
+            
+            document.body.appendChild(popup);
+            
+            // סגירה אוטומטית אחרי 5 שניות אם לא נסגר ידנית
+            setTimeout(() => {
+                if (popup && popup.parentElement) {
+                    popup.remove();
+                }
+            }, 5000);
         }
         
         // שילוב תוצאות ניתוח IP והתנהגות
@@ -4046,7 +4071,7 @@
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: center;">
                         <div>
                             <div style="font-size: 2em; font-weight: bold;">${results.summary.totalEntries.toLocaleString()}</div>
-                            <div style="opacity: 0.9;">סה"כ רשומות</div>
+                            <div style="opacity: 0.9;">סה"כ כניסות לעמוד</div>
                         </div>
                         <div>
                             <div style="font-size: 2em; font-weight: bold; color: #ff6b6b;">${results.summary.botCount.toLocaleString()}</div>
@@ -4054,22 +4079,83 @@
                         </div>
                         <div>
                             <div style="font-size: 2em; font-weight: bold; color: #4ecdc4;">${results.summary.humanCount.toLocaleString()}</div>
-                            <div style="opacity: 0.9;">בני אדם (${(results.summary.humanRatio || 0)}%)</div>
+                            <div style="opacity: 0.9;">בני אדם שנכנסו (${(results.summary.humanRatio || 0)}%)</div>
                         </div>
                         ${results.summary.totalClicks !== undefined ? `
-                        <div>
+                        <div style="border: 3px solid #ffd93d; border-radius: 10px; padding: 10px; background: rgba(255, 211, 61, 0.1);">
                             <div style="font-size: 2em; font-weight: bold; color: #ffd93d;">${results.summary.totalClicks.toLocaleString()}</div>
-                            <div style="opacity: 0.9;">קליקים</div>
+                            <div style="opacity: 0.9; font-weight: bold;">✅ לחצו על WhatsApp/טלפון</div>
                         </div>
                         ` : ''}
                     </div>
                 </div>
+
+                <!-- ניתוח מסלול המרה -->
+                ${results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined ? `
+                <div style="background: rgba(33, 150, 243, 0.15); border: 1px solid #2196F3; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="color: #2196F3; margin-bottom: 15px; text-align: center;">🔄 ניתוח מסלול לקוחות (Conversion Funnel)</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                        
+                        <!-- כניסות לעמוד -->
+                        <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #90CAF9;">${(results.summary.totalClicks + results.summary.totalNonClicks).toLocaleString()}</div>
+                            <div style="font-size: 0.9em; opacity: 0.9;">👥 נכנסו לעמוד</div>
+                        </div>
+
+                        <!-- חץ -->
+                        <div style="color: #FFC107; font-size: 2em;">→</div>
+
+                        <!-- ראו את התוכן -->
+                        <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #FFB74D;">${results.summary.totalNonClicks.toLocaleString()}</div>
+                            <div style="font-size: 0.9em; opacity: 0.9;">👀 צפו בתוכן אבל עזבו</div>
+                            <div style="font-size: 0.8em; color: #FF7043; margin-top: 5px;">❌ לא לחצו על כלום</div>
+                        </div>
+
+                        <!-- חץ -->
+                        <div style="color: #4CAF50; font-size: 2em;">→</div>
+
+                        <!-- לחצו על WhatsApp -->
+                        <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(76, 175, 80, 0.2); border: 2px solid #4CAF50; border-radius: 8px;">
+                            <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${results.summary.totalClicks.toLocaleString()}</div>
+                            <div style="font-size: 0.9em; font-weight: bold;">✅ לחצו על WhatsApp/טלפון</div>
+                            <div style="font-size: 0.8em; color: #66BB6A; margin-top: 5px;">🎯 המירו ללקוחות!</div>
+                        </div>
+                    </div>
+                    
+                    <!-- שיעור המרה -->
+                    <div style="margin-top: 20px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                        <div style="font-size: 1.2em; font-weight: bold; color: #FFC107;">
+                            📈 שיעור המרה: ${((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1)}%
+                        </div>
+                        <div style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">
+                            מתוך כל מי שנכנס לעמוד, ${((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1)}% באמת לחצו על WhatsApp/טלפון
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
 
                 <!-- גרף עוגה -->
                 <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
                     <h4 style="color: #FF9800; margin-bottom: 15px;">🥧 התפלגות תנועה</h4>
                     <div style="position: relative; height: 200px;">
                         ${createAdvancedPieChart(results.summary)}
+                    </div>
+                </div>
+
+                <!-- כפתורי הורדת דוח -->
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                    <h4 style="color: #2196F3; margin-bottom: 15px;">📥 הורדת דוח ניתוח</h4>
+                    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                        <button onclick="downloadAnalysisReport('json')" style="background: linear-gradient(45deg, #4CAF50, #66BB6A); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s ease;">
+                            📄 הורד JSON
+                        </button>
+                        <button onclick="downloadAnalysisReport('csv')" style="background: linear-gradient(45deg, #FF9800, #FFB74D); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s ease;">
+                            📊 הורד CSV
+                        </button>
+                        <button onclick="downloadAnalysisReport('summary')" style="background: linear-gradient(45deg, #9C27B0, #BA68C8); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: bold; transition: all 0.3s ease;">
+                            📋 הורד סיכום טקסט
+                        </button>
                     </div>
                 </div>
                 
@@ -4122,6 +4208,13 @@
                 );
             }
 
+            // ניתוח זמני שהייה ונטישה
+            html += createCollapsibleSection(
+                'abandonment-analysis', 
+                '⏱️ ניתוח זמני שהייה ונטישה', 
+                createAbandonmentAnalysis(results)
+            );
+
             // המלצות
             if (results.recommendations && results.recommendations.length > 0) {
                 html += `
@@ -4141,7 +4234,167 @@
             
             contentDiv.innerHTML = html;
             
+            // שמירת תוצאות הניתוח למשתנה גלובלי להורדה
+            window.lastAnalysisResults = results;
+            
             console.log('✅ Analysis complete:', results);
+        }
+
+        // הורדת דוח ניתוח קבצים שהועלו
+        function downloadAnalysisReport(format) {
+            if (!window.lastAnalysisResults) {
+                showClosablePopup('❌ אין תוצאות ניתוח זמינות להורדה');
+                return;
+            }
+
+            const results = window.lastAnalysisResults;
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            let filename, content, mimeType;
+
+            switch (format) {
+                case 'json':
+                    filename = `bot_analysis_report_${timestamp}.json`;
+                    content = JSON.stringify(results, null, 2);
+                    mimeType = 'application/json';
+                    break;
+
+                case 'csv':
+                    filename = `bot_analysis_report_${timestamp}.csv`;
+                    content = generateAnalysisCSV(results);
+                    mimeType = 'text/csv;charset=utf-8;';
+                    break;
+
+                case 'summary':
+                    filename = `bot_analysis_summary_${timestamp}.txt`;
+                    content = generateAnalysisSummary(results);
+                    mimeType = 'text/plain;charset=utf-8;';
+                    break;
+
+                default:
+                    showClosablePopup('❌ פורמט לא נתמך');
+                    return;
+            }
+
+            // יצירת קובץ והורדה
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showClosablePopup(`📥 דוח ${format.toUpperCase()} הורד בהצלחה!`);
+        }
+
+        // יצירת CSV מתוצאות הניתוח
+        function generateAnalysisCSV(results) {
+            let csv = 'קטגוריה,ערך,פרטים\n';
+
+            // סיכום כללי
+            csv += `סה"כ כניסות לעמוד,${results.summary.totalEntries},כולל בוטים ובני אדם\n`;
+            csv += `בוטים,${results.summary.botCount},${results.summary.botRatio}%\n`;
+            csv += `בני אדם שנכנסו,${results.summary.humanCount},${results.summary.humanRatio}%\n`;
+            
+            if (results.summary.totalClicks !== undefined) {
+                csv += `לחצו על WhatsApp/טלפון,${results.summary.totalClicks},פעולות אמיתיות\n`;
+            }
+            
+            if (results.summary.totalNonClicks !== undefined) {
+                csv += `צפו בתוכן אבל עזבו,${results.summary.totalNonClicks},לא ביצעו פעולה\n`;
+            }
+
+            // שיעור המרה
+            if (results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined) {
+                const conversionRate = ((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
+                csv += `שיעור המרה,${conversionRate}%,מתוך כל מי שנכנס לעמוד\n`;
+            }
+
+            // נתוני מספרי טלפון
+            if (results.phoneNumberStats) {
+                csv += '\nמספר טלפון,קליקים,בקשות ללא קליק,בוטים,בני אדם\n';
+                Object.entries(results.phoneNumberStats).forEach(([phone, stats]) => {
+                    csv += `${phone},${stats.clicks},${stats.nonClicks},${stats.bots},${stats.humans}\n`;
+                });
+            }
+
+            // נתוני IP
+            if (results.ipAnalysis) {
+                csv += '\nכתובת IP,מספר פניות,סוג\n';
+                Object.entries(results.ipAnalysis).forEach(([ip, data]) => {
+                    const type = data.isBot ? 'בוט' : data.isHuman ? 'אדם' : 'לא ידוע';
+                    csv += `${ip},${data.count},${type}\n`;
+                });
+            }
+
+            return csv;
+        }
+
+        // יצירת סיכום טקסט
+        function generateAnalysisSummary(results) {
+            let summary = '📊 דוח ניתוח בוטים מתקדם\n';
+            summary += '='.repeat(40) + '\n\n';
+
+            summary += `📅 תאריך: ${new Date().toLocaleDateString('he-IL')}\n`;
+            summary += `⏰ שעה: ${new Date().toLocaleTimeString('he-IL')}\n\n`;
+
+            summary += '📈 סיכום כללי:\n';
+            summary += '-'.repeat(20) + '\n';
+            summary += `• סה"כ כניסות לעמוד: ${results.summary.totalEntries.toLocaleString()}\n`;
+            summary += `• בוטים זוהו: ${results.summary.botCount.toLocaleString()} (${results.summary.botRatio}%)\n`;
+            summary += `• בני אדם שנכנסו: ${results.summary.humanCount.toLocaleString()} (${results.summary.humanRatio}%)\n`;
+            
+            if (results.summary.totalClicks !== undefined) {
+                summary += `• ✅ לחצו על WhatsApp/טלפון: ${results.summary.totalClicks.toLocaleString()}\n`;
+            }
+            
+            if (results.summary.totalNonClicks !== undefined) {
+                summary += `• ❌ צפו בתוכן אבל עזבו: ${results.summary.totalNonClicks.toLocaleString()}\n`;
+            }
+
+            // שיעור המרה
+            if (results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined) {
+                const conversionRate = ((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1);
+                summary += `• 📈 שיעור המרה: ${conversionRate}% (מתוך כל מי שנכנס לעמוד)\n`;
+                
+                // נתונים נוספים
+                summary += `\n🔍 ניתוח התנהגות:\n`;
+                summary += '-'.repeat(20) + '\n';
+                summary += `• ${results.summary.totalNonClicks} אנשים עזבו את העמוד מבלי לבצע פעולה\n`;
+                summary += `• זמן שהייה ממוצע עד נטישה: לא זמין בקובץ זה\n`;
+                summary += `• נקודות נטישה עיקריות: צפייה בתוכן בלבד\n`;
+                summary += `• הצעה לשיפור: חיזוק קריאת הפעולה (Call to Action)\n`;
+            }
+            
+            if (results.summary.suspiciousActivities !== undefined) {
+                summary += `• פעילויות חשודות: ${results.summary.suspiciousActivities}\n`;
+            }
+
+            // המלצות
+            if (results.recommendations && results.recommendations.length > 0) {
+                summary += '\n💡 המלצות מערכת:\n';
+                summary += '-'.repeat(20) + '\n';
+                results.recommendations.forEach(rec => {
+                    summary += `• ${rec}\n`;
+                });
+            }
+
+            // נתונים מפורטים
+            if (results.phoneNumberStats) {
+                summary += '\n📞 סיכום מספרי טלפון:\n';
+                summary += '-'.repeat(25) + '\n';
+                Object.entries(results.phoneNumberStats).forEach(([phone, stats]) => {
+                    summary += `${phone}: ${stats.clicks} קליקים, ${stats.bots} בוטים, ${stats.humans} אנשים\n`;
+                });
+            }
+
+            summary += '\n' + '='.repeat(40) + '\n';
+            summary += '🤖 מערכת זיהוי בוטים מתקדמת - נוצר אוטומטית\n';
+
+            return summary;
         }
 
         // הוספת סגנונות לטבלאות נפתחות
@@ -4191,6 +4444,60 @@
                 .collapsible-content.active {
                     max-height: 1000px;
                     padding: 20px;
+                }
+                
+                /* פופ-אפ נסגר */
+                .closeable-popup {
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.9);
+                    color: white;
+                    padding: 20px 30px;
+                    border-radius: 15px;
+                    border: 2px solid #4CAF50;
+                    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+                    z-index: 10000;
+                    text-align: center;
+                    font-size: 16px;
+                    max-width: 400px;
+                    animation: popup-in 0.3s ease-out;
+                }
+                
+                .closeable-popup .close-btn {
+                    position: absolute;
+                    top: -10px;
+                    right: -10px;
+                    background: #ff4444;
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 30px;
+                    height: 30px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    font-weight: bold;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.3s ease;
+                }
+                
+                .closeable-popup .close-btn:hover {
+                    background: #ff6666;
+                    transform: scale(1.1);
+                }
+                
+                @keyframes popup-in {
+                    from {
+                        opacity: 0;
+                        transform: translate(-50%, -50%) scale(0.8);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translate(-50%, -50%) scale(1);
+                    }
                 }
                 
                 .data-table {
@@ -4469,6 +4776,97 @@
             }
             
             html += `</div></div>`;
+            return html;
+        }
+
+        // ניתוח זמני שהייה ונטישה
+        function createAbandonmentAnalysis(results) {
+            const summary = results.summary;
+            const abandonmentRate = summary.totalNonClicks && summary.totalClicks ? 
+                ((summary.totalNonClicks / (summary.totalNonClicks + summary.totalClicks)) * 100).toFixed(1) : 0;
+            
+            let html = `
+                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px;">
+                    <h4 style="color: #FF5722; margin-bottom: 20px; text-align: center;">📊 ניתוח נטישה מפורט</h4>
+                    
+                    <!-- סטטיסטיקות נטישה עיקריות -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                        <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid #F44336; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.8em; font-weight: bold; color: #F44336;">${abandonmentRate}%</div>
+                            <div style="color: #ccc; font-size: 0.9em;">שיעור נטישה</div>
+                        </div>
+                        
+                        ${summary.totalNonClicks ? `
+                        <div style="background: rgba(255, 152, 0, 0.1); border: 1px solid #FF9800; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.8em; font-weight: bold; color: #FF9800;">${summary.totalNonClicks}</div>
+                            <div style="color: #ccc; font-size: 0.9em;">עזבו ללא פעולה</div>
+                        </div>
+                        ` : ''}
+                        
+                        ${summary.totalClicks ? `
+                        <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 1.8em; font-weight: bold; color: #4CAF50;">${summary.totalClicks}</div>
+                            <div style="color: #ccc; font-size: 0.9em;">ביצעו פעולה</div>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- ניתוח נקודות נטישה -->
+                    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <h5 style="color: #FFC107; margin-bottom: 15px;">🎯 נקודות נטישה עיקריות</h5>
+                        <div style="text-align: right;">
+                            <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
+                                <strong style="color: #FF7043;">📖 צפייה בתוכן בלבד:</strong> ${summary.totalNonClicks || 0} מבקרים
+                                <div style="font-size: 0.85em; color: #ccc; margin-top: 5px;">
+                                    אנשים שקראו את התוכן אבל לא לחצו על כפתור WhatsApp/טלפון
+                                </div>
+                            </div>
+                            <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
+                                <strong style="color: #FF7043;">⏱️ זמן שהייה ממוצע:</strong> לא זמין בנתונים
+                                <div style="font-size: 0.85em; color: #ccc; margin-top: 5px;">
+                                    דורש נתוני tracking זמן מהאתר שלך
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- המלצות לשיפור המרה -->
+                    <div style="background: rgba(33, 150, 243, 0.1); border: 1px solid #2196F3; padding: 20px; border-radius: 8px;">
+                        <h5 style="color: #2196F3; margin-bottom: 15px;">💡 הצעות לשיפור המרה</h5>
+                        <ul style="text-align: right; list-style: none; padding: 0; color: #e0e0e0;">
+                            <li style="margin: 8px 0; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                🔥 חיזוק קריאת הפעולה (Call to Action) - גרס כפתור WhatsApp יותר בולט
+                            </li>
+                            <li style="margin: 8px 0; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                📱 הוספת דחיפות - "לחץ עכשיו לקבלת מענה מיידי"
+                            </li>
+                            <li style="margin: 8px 0; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                🎁 הוספת תמריץ - "קבל ייעוץ ראשוני חינם"
+                            </li>
+                            <li style="margin: 8px 0; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                📊 A/B Testing - נסה וריאציות שונות של העמוד
+                            </li>
+                            <li style="margin: 8px 0; padding: 8px 0;">
+                                💬 הוספת המלצות לקוחות או מספר לקוחות מרוצים
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- בנצמרק התעשייה -->
+                    <div style="background: rgba(156, 39, 176, 0.1); border: 1px solid #9C27B0; padding: 15px; border-radius: 8px; margin-top: 15px; text-align: center;">
+                        <h6 style="color: #9C27B0; margin-bottom: 10px;">📈 השוואה לממוצע התעשייה</h6>
+                        <div style="font-size: 0.9em; color: #e0e0e0;">
+                            <div>• שיעור המרה טיפוסי לעמודי נחיתה: 2-5%</div>
+                            <div>• שיעור המרה טוב: 5-10%</div>
+                            <div>• שיעור המרה מעולה: 10%+</div>
+                            <div style="margin-top: 10px; font-weight: bold; color: ${parseFloat(abandonmentRate) > 90 ? '#F44336' : parseFloat(abandonmentRate) > 85 ? '#FF9800' : '#4CAF50'};">
+                                השיעור שלך (${(100 - parseFloat(abandonmentRate)).toFixed(1)}%): ${parseFloat(abandonmentRate) > 90 ? 'נמוך - דורש שיפור' : parseFloat(abandonmentRate) > 85 ? 'בינוני' : 'טוב!'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
             return html;
         }
 
