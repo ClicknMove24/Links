@@ -1048,6 +1048,9 @@
                     unique_sessions: [...new Set(analyticsData.map(e => e.session_id))].length,
                     unique_visitors: [...new Set(analyticsData.map(e => e.visitor_id))].length
                 },
+                sources: getSourcesSummary(),
+                utm_campaigns: getUTMSummary(),
+                bot_analysis: getBotAnalysis(),
                 events: analyticsData
             };
             
@@ -1108,19 +1111,7 @@
             alert('📊 דוח CSV הורד בהצלחה!');
         }
         
-        function getSourceFromEvent(event) {
-            const utmSource = new URLSearchParams(event.url ? new URL(event.url).search : '').get('utm_source');
-            if (utmSource) return utmSource;
-            
-            if (event.referrer && event.referrer !== '') {
-                try {
-                    return new URL(event.referrer).hostname;
-                } catch (e) {
-                    return 'רפרר לא ידוע';
-                }
-            }
-            return 'גישה ישירה';
-        }
+        // Original getSourceFromEvent function removed - duplicate
         
         function clearAllData() {
             if (confirm('⚠️ האם אתה בטוח שתרצה למחוק את כל הנתונים?')) {
@@ -1157,46 +1148,80 @@
                 return;
             }
             
-            const botEvents = analyticsData.filter(e => e.type === 'bot_detection' && e.bot_score !== undefined);
-            const sources = {};
+            const sources = getSourcesSummary();
+            const campaigns = getUTMSummary();
+            const botAnalysis = getBotAnalysis();
             
-            analyticsData.forEach(event => {
-                const source = getSourceFromEvent(event);
-                sources[source] = (sources[source] || 0) + 1;
-            });
+            let summary = '📋 סיכום נתונים:\n';
+            summary += '═══════════════════\n\n';
             
-            let summary = '📋 סיכום נתונים:\n═══════════════════\n\n';
             summary += `📊 סך הכל אירועים: ${analyticsData.length}\n`;
             summary += `👥 מבקרים ייחודיים: ${[...new Set(analyticsData.map(e => e.visitor_id))].length}\n`;
             summary += `🔗 סשנים ייחודיים: ${[...new Set(analyticsData.map(e => e.session_id))].length}\n\n`;
             
-            if (botEvents.length > 0) {
-                const avgBotScore = Math.round(botEvents.reduce((sum, e) => sum + e.bot_score, 0) / botEvents.length);
-                summary += `🤖 ניתוח בוטים:\n`;
-                summary += `• זיהויים כוללים: ${botEvents.length}\n`;
-                summary += `• ציון ממוצע: ${avgBotScore}\n\n`;
-            }
+            summary += '🤖 ניתוח בוטים:\n';
+            summary += `• זיהויים כוללים: ${botAnalysis.total_detections}\n`;
+            summary += `• בוטים מאושרים: ${botAnalysis.confirmed_bots}\n`;
+            summary += `• חשודים: ${botAnalysis.suspicious}\n`;
+            summary += `• כנראה אנשים: ${botAnalysis.likely_humans}\n`;
+            summary += `• ציון ממוצע: ${botAnalysis.avg_bot_score}\n\n`;
             
             summary += '🌐 מקורות מובילים:\n';
             Object.entries(sources)
-                .sort((a, b) => b[1] - a[1])
+                .sort((a, b) => b[1].visits - a[1].visits)
                 .slice(0, 5)
-                .forEach(([source, count]) => {
-                    summary += `• ${source}: ${count}\n`;
+                .forEach(([source, data]) => {
+                    summary += `• ${source}: ${data.visits} (${data.bots} בוטים)\n`;
                 });
+            
+            if (Object.keys(campaigns).length > 0) {
+                summary += '\n🎯 קמפיינים מובילים:\n';
+                Object.entries(campaigns)
+                    .sort((a, b) => b[1].visits - a[1].visits)
+                    .slice(0, 5)
+                    .forEach(([campaign, data]) => {
+                        summary += `• ${campaign}: ${data.visits} ביקורים\n`;
+                    });
+            }
+            
+            summary += '\n💾 נתונים נשמרו ב-localStorage';
             
             alert(summary);
         }
 
         // קבלת מקור מאירוע
+        // סיכום מקורות התנועה
+        function getSourcesSummary() {
+            const data = localStorage.getItem('custom_analytics');
+            const analyticsData = data ? JSON.parse(data) : [];
+            const sources = {};
+            
+            analyticsData.forEach(event => {
+                const source = getSourceFromEvent(event);
+                if (!sources[source]) {
+                    sources[source] = { visits: 0, bots: 0 };
+                }
+                sources[source].visits++;
+                if (event.bot_score && event.bot_score > 50) {
+                    sources[source].bots++;
+                }
+            });
+            
+            return sources;
+        }
+
         function getSourceFromEvent(event) {
             if (event.utm_params && event.utm_params.utm_source) {
                 return event.utm_params.utm_source;
             }
             if (event.url) {
-                const url = new URL(event.url);
-                const utmSource = url.searchParams.get('utm_source');
-                if (utmSource) return utmSource;
+                try {
+                    const url = new URL(event.url);
+                    const utmSource = url.searchParams.get('utm_source');
+                    if (utmSource) return utmSource;
+                } catch (e) {
+                    // Handle invalid URL
+                }
             }
             if (event.referrer && event.referrer !== '') {
                 try {
@@ -1263,6 +1288,14 @@
             };
             
             return analysis;
+        }
+
+        // עדכון סטטיסטיקה
+        function updateStatistic(statType) {
+            if (realTimeStats[statType] !== undefined) {
+                realTimeStats[statType]++;
+                updateRealTimeStatsDisplay();
+            }
         }
 
         // מעקב התנהגות
