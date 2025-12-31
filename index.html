@@ -372,9 +372,15 @@
         </div>
         
         <div class="dashboard-grid">
-            <!-- ניתוח מקורות -->
+            <!-- משתמשים פעילים -->
             <div class="card">
                 <h3 style="color: #ffd700; margin-bottom: 15px;">👥 משתמשים פעילים</h3>
+                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9em; line-height: 1.4;">
+                    📱 <strong>איך לבדוק זיהוי בזמן אמת:</strong><br>
+                    1. שלח את הקישור לטלפון/מכשיר אחר<br>
+                    2. או פתח טאב חדש במצב אנונימי<br>
+                    3. תראה התראה כשמישהו נכנס! 🔔
+                </div>
                 <div id="visitors-list" style="max-height: 200px; overflow-y: auto; text-align: right;">
                     <div class="visitor-item" style="padding: 8px; margin: 5px 0; background: rgba(255,255,255,0.1); border-radius: 5px; display: flex; justify-content: space-between; align-items: center;">
                         <small style="opacity: 0.7;" id="current-user-time">עכשיו</small>
@@ -1993,20 +1999,31 @@
             // רישום משתמש נוכחי
             registerCurrentVisitor();
             
-            // heartbeat כל 10 שניות
+            // heartbeat כל 5 שניות ובדיקת שינויים
+            let lastVisitorCount = Object.keys(getActiveVisitors()).length;
             setInterval(() => {
                 sendHeartbeat();
+                
+                // בדיקת שינויים במספר הגולשים
+                const visitors = getActiveVisitors();
+                const currentCount = Object.keys(visitors).length;
+                
+                if (currentCount > lastVisitorCount) {
+                    showNewVisitorNotification();
+                    console.log(`🔔 זוהה משתמש חדש! סך הכל: ${currentCount} משתמשים פעילים`);
+                }
+                
+                lastVisitorCount = currentCount;
                 updateActiveVisitorsList();
                 cleanupInactiveVisitors();
-            }, 10000);
+            }, 5000);
             
             // מעקב אחרי עזיבת הדף
             window.addEventListener('beforeunload', () => {
                 removeCurrentVisitor();
             });
             
-            // מעקב אחרי שינויים ב-localStorage (משתמשים אחרים)
-            let lastVisitorCount = Object.keys(getActiveVisitors()).length;
+            // מעקב אחרי שינויים ב-localStorage (עובד רק בין חלונות/טאבים שונים)
             window.addEventListener('storage', (e) => {
                 if (e.key === 'active_visitors') {
                     const visitors = getActiveVisitors();
@@ -2014,12 +2031,16 @@
                     
                     if (currentCount > lastVisitorCount) {
                         showNewVisitorNotification();
+                        console.log(`📱 משתמש חדש זוהה מחלון אחר! סך הכל: ${currentCount}`);
                     }
                     
                     lastVisitorCount = currentCount;
                     updateActiveVisitorsList();
                 }
             });
+            
+            // הוספת כפתור לבדיקת הגלישה החיה
+            addTestingButtons();
         }
 
         function registerCurrentVisitor() {
@@ -2351,6 +2372,93 @@
             }
             
             console.log('🎉 משתמש חדש נכנס לאתר!');
+        }
+
+        // הוספת כפתורי בדיקה לפיתוח
+        function addTestingButtons() {
+            // יצירת פאנל בדיקה
+            const testPanel = document.createElement('div');
+            testPanel.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                left: 20px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 15px;
+                border-radius: 10px;
+                z-index: 999;
+                font-size: 12px;
+                border: 1px solid #444;
+            `;
+            
+            testPanel.innerHTML = `
+                <div style="margin-bottom: 10px; font-weight: bold;">🧪 כלי בדיקה</div>
+                <button id="simulate-visitor" style="margin: 2px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; background: #4CAF50; color: white;">הדמה: משתמש חדש</button><br>
+                <button id="clear-visitors" style="margin: 2px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; background: #f44336; color: white;">נקה כל הגולשים</button><br>
+                <button id="show-visitors" style="margin: 2px; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; background: #2196F3; color: white;">הצג גולשים</button><br>
+                <small style="opacity: 0.7;">לבדיקה אמיתית: פתח קישור בטלפון או טאב חדש</small>
+            `;
+            
+            document.body.appendChild(testPanel);
+            
+            // הוספת פונקציונליות לכפתורים
+            document.getElementById('simulate-visitor').addEventListener('click', () => {
+                simulateNewVisitor();
+            });
+            
+            document.getElementById('clear-visitors').addEventListener('click', () => {
+                clearAllVisitors();
+            });
+            
+            document.getElementById('show-visitors').addEventListener('click', () => {
+                showCurrentVisitors();
+            });
+        }
+
+        // הדמיית משתמש חדש לבדיקה
+        function simulateNewVisitor() {
+            const visitors = getActiveVisitors();
+            const fakeId = 'test_visitor_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+            
+            visitors[fakeId] = {
+                sessionId: 'test_session_' + Date.now(),
+                joinTime: Date.now(),
+                lastSeen: Date.now(),
+                userAgent: 'Test User Agent (Simulated)',
+                deviceType: 'בדיקה',
+                isBot: Math.random() > 0.7 // 30% סיכוי להיות בוט
+            };
+            
+            saveActiveVisitors(visitors);
+            
+            console.log(`🧪 הדמיית משתמש חדש: ${fakeId.substring(0, 20)}...`);
+            console.log('📊 סך הכל גולשים פעילים:', Object.keys(visitors).length);
+            
+            // עדכון מידי של הרשימה
+            updateActiveVisitorsList();
+        }
+
+        // ניקוי כל הגולשים
+        function clearAllVisitors() {
+            localStorage.removeItem('active_visitors');
+            console.log('🧹 כל הגולשים נוקו');
+            
+            // רישום מחדש של המשתמש הנוכחי
+            setTimeout(() => {
+                registerCurrentVisitor();
+                updateActiveVisitorsList();
+            }, 100);
+        }
+
+        // הצגת גולשים נוכחיים
+        function showCurrentVisitors() {
+            const visitors = getActiveVisitors();
+            console.log('👥 גולשים פעילים נוכחיים:', visitors);
+            console.log('📈 מספר גולשים:', Object.keys(visitors).length);
+            
+            Object.entries(visitors).forEach(([id, visitor], index) => {
+                console.log(`${index + 1}. ${id.substring(0, 15)}... - ${visitor.deviceType} - ${visitor.isBot ? '🤖 בוט' : '👤 אנושי'}`);
+            });
         }
 
         // הצגת מידע ראשוני
