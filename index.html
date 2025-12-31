@@ -1265,6 +1265,62 @@
             return analysis;
         }
 
+        // מעקב התנהגות
+        function initBehaviorTracking() {
+            document.addEventListener('mousemove', (e) => {
+                behaviorAnalysis.mouseMovements.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+                
+                if (behaviorAnalysis.mouseMovements.length > 100) {
+                    behaviorAnalysis.mouseMovements.shift();
+                }
+                updateStatistic('mouseMovements');
+            });
+            
+            document.addEventListener('click', (e) => {
+                behaviorAnalysis.clicks.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+                updateStatistic('pageInteractions');
+            });
+            
+            document.addEventListener('scroll', () => {
+                behaviorAnalysis.scrollEvents.push({
+                    scrollY: window.scrollY,
+                    timestamp: Date.now()
+                });
+                updateStatistic('pageInteractions');
+            });
+            
+            document.addEventListener('keydown', (e) => {
+                behaviorAnalysis.keystrokes.push({
+                    key: e.key,
+                    timestamp: Date.now()
+                });
+            });
+            
+            // בדיקה תקופתית להתנהגות חשודה
+            setInterval(() => {
+                const now = Date.now();
+                const recentMovements = behaviorAnalysis.mouseMovements.filter(m => now - m.timestamp < 10000);
+                
+                if (recentMovements.length === 0 && behaviorAnalysis.clicks.length > 0) {
+                    logAnalyticsEvent('suspicious_behavior', {
+                        'patterns': 'לחיצות ללא תנועת עכבר',
+                        'mouse_movements': recentMovements.length,
+                        'clicks': behaviorAnalysis.clicks.length,
+                        'risk_score': 50
+                    });
+                    updateStatistic('suspiciousActivities');
+                }
+            }, 30000);
+        }
+
         // הפעלה אוטומטית
         window.onload = async () => {
             // ניתוח מקור הגעה
