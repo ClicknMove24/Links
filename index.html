@@ -806,7 +806,69 @@
                     detectionMethods.push('Timing Analysis');
                 }
             }
+
+            // 11. בדיקת מאפייני דפדפן מתקדמים
+            if (navigator.hardwareConcurrency > 16) {
+                botScore += 10;
+                reasons.push(`💻 מעבדים רבים חריגים: ${navigator.hardwareConcurrency}`);
+                detectionMethods.push('Hardware Check');
+            }
+
+            // 12. בדיקת DeviceMemory
+            if (navigator.deviceMemory && navigator.deviceMemory > 32) {
+                botScore += 5;
+                reasons.push(`💾 זיכרון גדול חריג: ${navigator.deviceMemory}GB`);
+                detectionMethods.push('Memory Check');
+            }
+
+            // 13. בדיקת Headless דפדפן
+            if (window.outerWidth === 0 || window.outerHeight === 0) {
+                botScore += 30;
+                reasons.push('🖥️ חלון ללא גודל (Headless)');
+                detectionMethods.push('Headless Check');
+            }
+
+            // 14. בדיקת מהירות עיבוד JavaScript
+            const startTime = performance.now();
+            for (let i = 0; i < 100000; i++) { /* empty loop */ }
+            const endTime = performance.now();
+            const jsSpeed = endTime - startTime;
             
+            if (jsSpeed < 1) {
+                botScore += 15;
+                reasons.push(`⚡ JavaScript מהיר מדי: ${jsSpeed.toFixed(2)}ms`);
+                detectionMethods.push('JS Speed Test');
+            }
+
+            // 15. בדיקת חתימה דיגיטלית של דפדפן
+            const browserFingerprint = [
+                navigator.userAgent,
+                navigator.platform,
+                navigator.language,
+                screen.colorDepth,
+                new Date().getTimezoneOffset(),
+                navigator.cookieEnabled
+            ].join('|');
+            
+            // בדיקה פשוטה של חתימות ידועות של בוטים
+            const knownBotFingerprints = [
+                'headless', 'phantomjs', 'selenium', 'webdriver'
+            ];
+            
+            if (knownBotFingerprints.some(fp => browserFingerprint.toLowerCase().includes(fp))) {
+                botScore += 25;
+                reasons.push('🔍 חתימה דיגיטלית חשודה');
+                detectionMethods.push('Fingerprint Analysis');
+            }
+            
+            // בדיקת פעילות משתמש אמיתית
+            const humanActivityScore = calculateHumanActivity();
+            if (humanActivityScore > 0) {
+                botScore = Math.max(0, botScore - humanActivityScore);
+                reasons.push(`✅ פעילות אנושית זוהתה (הנחה: ${humanActivityScore})`);
+                detectionMethods.push('Human Activity');
+            }
+
             // חישוב ציון סופי ורמת ביטחון
             botScore = Math.min(botScore, 100);
             
@@ -823,15 +885,206 @@
             // עדכון ממשק המשתמש
             updateBotDetectionUI(botScore, confidence, reasons, detectionMethods);
             
+            // לוג לקונסול
+            console.log(`🤖 עדכון ציון בוט: ${botScore}/100 | אמינות: ${confidence}%`);
+            console.log(`📊 פעילות אנושית: ${humanActivityScore} נקודות`);
+            console.log(`🔍 שיטות זיהוי: ${detectionMethods.join(', ')}`);
+            
             // שליחה למערכת Analytics
             logAnalyticsEvent('bot_detection', {
                 'bot_score': botScore,
                 'confidence': confidence,
+                'human_activity_score': humanActivityScore,
                 'detection_methods': detectionMethods.join(','),
                 'reasons': reasons.join(';')
             });
         }
         
+        // חישוב פעילות אנושית מתקדם
+        function calculateHumanActivity() {
+            let humanScore = 0;
+            const now = Date.now();
+            
+            // 1. ניתוח דפוסי לחיצה
+            if (behaviorAnalysis.clicks.length > 0) {
+                const clickPattern = analyzeClickPattern(behaviorAnalysis.clicks);
+                humanScore += clickPattern.humanLikeScore;
+            }
+            
+            // 2. ניתוח תנועת עכבר
+            if (behaviorAnalysis.mouseMovements.length > 10) {
+                const mousePattern = analyzeMouseMovement(behaviorAnalysis.mouseMovements);
+                humanScore += mousePattern.humanLikeScore;
+            }
+            
+            // 3. ניתוח דפוסי גלילה
+            if (behaviorAnalysis.scrollEvents.length > 0) {
+                const scrollPattern = analyzeScrollBehavior(behaviorAnalysis.scrollEvents);
+                humanScore += scrollPattern.humanLikeScore;
+            }
+            
+            // 4. בדיקת זמן שהייה בדף
+            const timeOnPage = now - startTime;
+            if (timeOnPage > 5000) { // יותר מ-5 שניות
+                humanScore += Math.min(timeOnPage / 1000, 15); // עד 15 נקודות
+            }
+            
+            // 5. בדיקת מגוון פעילויות
+            const activityTypes = [];
+            if (realTimeStats.buttonClicks > 0) activityTypes.push('clicks');
+            if (realTimeStats.mouseMovements > 50) activityTypes.push('mouse');
+            if (realTimeStats.pageInteractions > 0) activityTypes.push('interactions');
+            
+            if (activityTypes.length >= 2) {
+                humanScore += 10; // בונוס למגוון פעילויות
+            }
+            
+            return Math.min(humanScore, 60); // מקסימום 60 נקודות הנחה
+        }
+
+        // ניתוח דפוסי לחיצה
+        function analyzeClickPattern(clicks) {
+            if (clicks.length === 0) return { humanLikeScore: 0 };
+            
+            let score = 0;
+            
+            // בדיקת מרווחי זמן בין לחיצות
+            if (clicks.length > 1) {
+                const intervals = [];
+                for (let i = 1; i < clicks.length; i++) {
+                    intervals.push(clicks[i].timestamp - clicks[i-1].timestamp);
+                }
+                
+                const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                
+                // מרווח אנושי רגיל: 300ms - 2000ms
+                if (avgInterval >= 300 && avgInterval <= 2000) {
+                    score += 15;
+                } else if (avgInterval < 100) {
+                    score -= 10; // לחיצות מהירות מדי (בוט)
+                }
+                
+                // וריאציה במרווחים (אנשים לא מדויקים)
+                const variance = intervals.reduce((sum, interval) => {
+                    return sum + Math.pow(interval - avgInterval, 2);
+                }, 0) / intervals.length;
+                
+                if (variance > 10000) { // יש וריאציה
+                    score += 10;
+                }
+            }
+            
+            // בדיקת מיקומי לחיצה
+            const positions = clicks.map(click => ({ x: click.x, y: click.y }));
+            if (positions.length > 1) {
+                const distances = [];
+                for (let i = 1; i < positions.length; i++) {
+                    const dx = positions[i].x - positions[i-1].x;
+                    const dy = positions[i].y - positions[i-1].y;
+                    distances.push(Math.sqrt(dx*dx + dy*dy));
+                }
+                
+                const avgDistance = distances.reduce((a, b) => a + b, 0) / distances.length;
+                if (avgDistance > 50) { // לחיצות במקומות שונים
+                    score += 8;
+                }
+            }
+            
+            return { humanLikeScore: Math.min(score, 25) };
+        }
+
+        // ניתוח תנועת עכבר
+        function analyzeMouseMovement(movements) {
+            if (movements.length < 10) return { humanLikeScore: 0 };
+            
+            let score = 0;
+            
+            // בדיקת רציפות התנועה
+            const recentMoves = movements.slice(-50); // 50 תנועות אחרונות
+            
+            // חישוב מהירות ממוצעת
+            let totalDistance = 0;
+            let totalTime = 0;
+            
+            for (let i = 1; i < recentMoves.length; i++) {
+                const dx = recentMoves[i].x - recentMoves[i-1].x;
+                const dy = recentMoves[i].y - recentMoves[i-1].y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                const timeDiff = recentMoves[i].timestamp - recentMoves[i-1].timestamp;
+                
+                totalDistance += distance;
+                totalTime += timeDiff;
+            }
+            
+            const avgSpeed = totalDistance / totalTime; // פיקסלים לשנייה
+            
+            // מהירות אנושית טיפוסית: 0.5-5 פיקסל/ms
+            if (avgSpeed >= 0.5 && avgSpeed <= 5) {
+                score += 15;
+            } else if (avgSpeed > 10) {
+                score -= 5; // מהיר מדי
+            }
+            
+            // בדיקת עקומות טבעיות (לא קווים ישרים)
+            let curves = 0;
+            for (let i = 2; i < Math.min(recentMoves.length, 20); i++) {
+                const angle1 = Math.atan2(
+                    recentMoves[i-1].y - recentMoves[i-2].y,
+                    recentMoves[i-1].x - recentMoves[i-2].x
+                );
+                const angle2 = Math.atan2(
+                    recentMoves[i].y - recentMoves[i-1].y,
+                    recentMoves[i].x - recentMoves[i-1].x
+                );
+                
+                const angleDiff = Math.abs(angle1 - angle2);
+                if (angleDiff > 0.1) curves++;
+            }
+            
+            if (curves > 5) {
+                score += 10; // תנועה עקומה טבעית
+            }
+            
+            return { humanLikeScore: Math.min(score, 20) };
+        }
+
+        // ניתוח התנהגות גלילה
+        function analyzeScrollBehavior(scrollEvents) {
+            if (scrollEvents.length === 0) return { humanLikeScore: 0 };
+            
+            let score = 0;
+            
+            // בדיקת מרווחי גלילה
+            if (scrollEvents.length > 1) {
+                const intervals = [];
+                for (let i = 1; i < scrollEvents.length; i++) {
+                    intervals.push(scrollEvents[i].timestamp - scrollEvents[i-1].timestamp);
+                }
+                
+                const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                
+                // גלילה אנושית: 200ms - 1000ms
+                if (avgInterval >= 200 && avgInterval <= 1000) {
+                    score += 8;
+                }
+            }
+            
+            // בדיקת כיוון גלילה (למעלה ולמטה)
+            const directions = [];
+            for (let i = 1; i < scrollEvents.length; i++) {
+                const diff = scrollEvents[i].scrollY - scrollEvents[i-1].scrollY;
+                if (diff > 0) directions.push('down');
+                else if (diff < 0) directions.push('up');
+            }
+            
+            const hasVariedScrolling = directions.includes('up') && directions.includes('down');
+            if (hasVariedScrolling) {
+                score += 7; // גלילה טבעית בשני כיוונים
+            }
+            
+            return { humanLikeScore: Math.min(score, 15) };
+        }
+
         // עדכון ממשק זיהוי בוטים
         function updateBotDetectionUI(botScore, confidence, reasons, methods) {
             const confidenceElement = document.getElementById('confidence-score');
@@ -942,7 +1195,13 @@
             
             realTimeStats.buttonClicks++;
             updateRealTimeStatsDisplay();
-            alert('לחיצה נרשמה במערכת Analytics המותאמת שלנו!');
+            
+            // בדיקה מחדש של ציון בוט אחרי פעילות
+            setTimeout(() => {
+                detectAdvancedBot();
+            }, 100);
+            
+            alert('🖱️ לחיצה נרשמה! בודק מחדש ציון בוט...');
         }
         
         function trackMouseMovement() {
@@ -963,7 +1222,11 @@
             
             setTimeout(() => {
                 document.removeEventListener('mousemove', handler);
-                alert(`נרשמו ${mouseMoveCount} תנועות עכבר במערכת Analytics המותאמת`);
+                
+                // בדיקה מחדש של ציון בוט אחרי פעילות עכבר
+                detectAdvancedBot();
+                
+                alert(`נרשמו ${mouseMoveCount} תנועות עכבר! מעדכן ציון בוט...`);
             }, 10000);
         }
         
@@ -989,46 +1252,100 @@
         }
         
         function startAdvancedBehaviorTest() {
-            alert('🧪 בדיקה מתקדמת החלה! בצע פעולות שונות במשך 10 שניות הבאות');
+            alert('🧪 מתחיל בדיקת התנהגות מתקדמת...\n\nבצע את הפעולות הבאות:\n• זוז את העכבר בדפוס טבעי\n• לחץ על מקומות שונים בדף\n• גלול למעלה ולמטה\n\nהבדיקה תימשך 15 שניות...');
             
-            let testData = { mouseEvents: 0, clickEvents: 0, scrollEvents: 0 };
+            // איפוס נתוני הבדיקה
+            behaviorAnalysis.mouseMovements = [];
+            behaviorAnalysis.clicks = [];
+            behaviorAnalysis.scrollEvents = [];
             
-            const mouseHandler = () => testData.mouseEvents++;
-            const clickHandler = () => testData.clickEvents++;
-            const scrollHandler = () => testData.scrollEvents++;
+            const testDuration = 15000;
             
-            document.addEventListener('mousemove', mouseHandler);
-            document.addEventListener('click', clickHandler);
-            document.addEventListener('scroll', scrollHandler);
+            // הוספת מאזינים מיוחדים לבדיקה
+            const testMouseHandler = (e) => {
+                behaviorAnalysis.mouseMovements.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+            };
+            
+            const testClickHandler = (e) => {
+                behaviorAnalysis.clicks.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+            };
+            
+            const testScrollHandler = () => {
+                behaviorAnalysis.scrollEvents.push({
+                    scrollY: window.scrollY,
+                    timestamp: Date.now()
+                });
+            };
+            
+            document.addEventListener('mousemove', testMouseHandler);
+            document.addEventListener('click', testClickHandler);
+            window.addEventListener('scroll', testScrollHandler);
             
             setTimeout(() => {
-                document.removeEventListener('mousemove', mouseHandler);
-                document.removeEventListener('click', clickHandler);
-                document.removeEventListener('scroll', scrollHandler);
+                // הסרת המאזינים
+                document.removeEventListener('mousemove', testMouseHandler);
+                document.removeEventListener('click', testClickHandler);
+                window.removeEventListener('scroll', testScrollHandler);
                 
-                let suspiciousScore = 0;
-                let findings = [];
+                // ניתוח תוצאות
+                const clickPattern = analyzeClickPattern(behaviorAnalysis.clicks);
+                const mousePattern = analyzeMouseMovement(behaviorAnalysis.mouseMovements);
+                const scrollPattern = analyzeScrollBehavior(behaviorAnalysis.scrollEvents);
+                const totalHumanScore = calculateHumanActivity();
                 
-                if (testData.mouseEvents === 0) {
-                    suspiciousScore += 50;
-                    findings.push('אין תנועת עכבר');
+                let message = '🧪 תוצאות בדיקה מתקדמת:\n';
+                message += `════════════════════════\n`;
+                message += `🎯 ציון אנושיות כללי: ${totalHumanScore}/60\n`;
+                message += `👆 ציון לחיצות: ${clickPattern.humanLikeScore}/25\n`;
+                message += `🖱️ ציון תנועת עכבר: ${mousePattern.humanLikeScore}/20\n`;
+                message += `📜 ציון גלילה: ${scrollPattern.humanLikeScore}/15\n\n`;
+                
+                message += `📊 סטטיסטיקות:\n`;
+                message += `• תנועות עכבר: ${behaviorAnalysis.mouseMovements.length}\n`;
+                message += `• לחיצות: ${behaviorAnalysis.clicks.length}\n`;
+                message += `• גלילות: ${behaviorAnalysis.scrollEvents.length}\n\n`;
+                
+                // הערכה כללית
+                if (totalHumanScore > 45) {
+                    message += `✅ התנהגות אנושית מובהקת!\n`;
+                    message += `הדפוסים שלך טבעיים ואנושיים.`;
+                } else if (totalHumanScore > 25) {
+                    message += `⚠️ התנהגות חלקית אנושית\n`;
+                    message += `יש סימנים אנושיים אבל לא מספיק ברור.`;
+                } else if (totalHumanScore > 10) {
+                    message += `🤔 התנהגות לא ברורה\n`;
+                    message += `קשה לקבוע אם אדם או בוט.`;
+                } else {
+                    message += `❌ התנהגות חשודה מאוד!\n`;
+                    message += `הדפוסים דומים לבוט.`;
                 }
                 
-                if (testData.clickEvents > 10) {
-                    suspiciousScore += 30;
-                    findings.push('יותר מדי לחיצות');
-                }
-                
+                // רישום באנליטיקס
                 logAnalyticsEvent('advanced_behavior_test', {
-                    'suspicious_score': suspiciousScore,
-                    'findings': findings.join(';'),
-                    'mouse_events': testData.mouseEvents,
-                    'click_events': testData.clickEvents,
-                    'scroll_events': testData.scrollEvents
+                    'total_human_score': totalHumanScore,
+                    'click_score': clickPattern.humanLikeScore,
+                    'mouse_score': mousePattern.humanLikeScore,
+                    'scroll_score': scrollPattern.humanLikeScore,
+                    'mouse_movements': behaviorAnalysis.mouseMovements.length,
+                    'clicks': behaviorAnalysis.clicks.length,
+                    'scrolls': behaviorAnalysis.scrollEvents.length
                 });
                 
-                alert(`תוצאות הבדיקה המתקדמת:\nציון חשדנות: ${suspiciousScore}/100\nתנועות עכבר: ${testData.mouseEvents}\nלחיצות: ${testData.clickEvents}\nגלילות: ${testData.scrollEvents}`);
-            }, 10000);
+                alert(message);
+                
+                // עדכון ציון הבוט עם התוצאות החדשות
+                setTimeout(() => {
+                    detectAdvancedBot();
+                }, 100);
+            }, testDuration);
         }
         
         // פונקציות הורדת דוחות
@@ -1354,8 +1671,24 @@
             }, 30000);
         }
 
+        // הצגת מידע ראשוני
+        function displayInitialInfo() {
+            // הצגת מידע בסיסי
+            document.getElementById('visit-time').textContent = new Date().toLocaleString('he-IL');
+            document.getElementById('session-id').textContent = sessionId.substring(0, 16) + '...';
+            document.getElementById('visitor-id').textContent = visitorId.substring(0, 16) + '...';
+            document.getElementById('screen-size').textContent = screen.width + 'x' + screen.height;
+            
+            // יצירת טביעת אצבע
+            deviceFingerprint = createDeviceFingerprint();
+            document.getElementById('device-fingerprint').textContent = deviceFingerprint;
+        }
+
         // הפעלה אוטומטית
         window.onload = async () => {
+            // הצגת מידע ראשוני
+            displayInitialInfo();
+            
             // ניתוח מקור הגעה
             analyzeReferrer();
             
