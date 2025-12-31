@@ -2891,17 +2891,26 @@
                     if (phoneEntry.clicks && Array.isArray(phoneEntry.clicks)) {
                         phoneEntry.clicks.forEach(click => {
                             totalClicks++;
-                            const analysis = analyzeComplexLogEntry(click, 'click', phoneNumber);
                             
-                            if (analysis.isBot) {
+                            // ניתוח מתקדם עם התנהגות
+                            const analysis = analyzeComplexLogEntry(click, 'click', phoneNumber);
+                            const behaviorAnalysis = analyzeBehaviorPatterns(
+                                click, 'click', phoneNumber, 
+                                [...(phoneEntry.clicks || []), ...(phoneEntry.non_click_requests || [])]
+                            );
+                            
+                            // משלב תוצאות הניתוח
+                            const finalResult = combineAnalysisResults(analysis, behaviorAnalysis);
+                            
+                            if (finalResult.isBot) {
                                 totalBots++;
                                 phoneNumberStats[phoneNumber].bots++;
-                            } else {
+                            } else if (finalResult.isHuman) {
                                 totalHumans++;
                                 phoneNumberStats[phoneNumber].humans++;
                             }
                             
-                            if (analysis.isSuspicious) {
+                            if (finalResult.isSuspicious) {
                                 suspiciousActivities++;
                                 phoneNumberStats[phoneNumber].suspicious++;
                             }
@@ -2911,7 +2920,7 @@
                                 clickDestinations[click.destination] = (clickDestinations[click.destination] || 0) + 1;
                             }
                             
-                            collectAdvancedStats(analysis, ipAnalysis, timeDistribution, sourceAnalysis);
+                            collectAdvancedStats(finalResult, ipAnalysis, timeDistribution, sourceAnalysis);
                         });
                     }
                     
@@ -2919,22 +2928,31 @@
                     if (phoneEntry.non_click_requests && Array.isArray(phoneEntry.non_click_requests)) {
                         phoneEntry.non_click_requests.forEach(request => {
                             totalNonClicks++;
-                            const analysis = analyzeComplexLogEntry(request, 'non_click', phoneNumber);
                             
-                            if (analysis.isBot) {
+                            // ניתוח מתקדם עם התנהגות
+                            const analysis = analyzeComplexLogEntry(request, 'non_click', phoneNumber);
+                            const behaviorAnalysis = analyzeBehaviorPatterns(
+                                request, 'non_click', phoneNumber, 
+                                [...(phoneEntry.clicks || []), ...(phoneEntry.non_click_requests || [])]
+                            );
+                            
+                            // משלב תוצאות הניתוח
+                            const finalResult = combineAnalysisResults(analysis, behaviorAnalysis);
+                            
+                            if (finalResult.isBot) {
                                 totalBots++;
                                 phoneNumberStats[phoneNumber].bots++;
-                            } else if (analysis.isHuman) {
+                            } else if (finalResult.isHuman) {
                                 totalHumans++;
                                 phoneNumberStats[phoneNumber].humans++;
                             }
                             
-                            if (analysis.isSuspicious) {
+                            if (finalResult.isSuspicious) {
                                 suspiciousActivities++;
                                 phoneNumberStats[phoneNumber].suspicious++;
                             }
                             
-                            collectAdvancedStats(analysis, ipAnalysis, timeDistribution, sourceAnalysis);
+                            collectAdvancedStats(finalResult, ipAnalysis, timeDistribution, sourceAnalysis);
                         });
                     }
                     
@@ -2988,25 +3006,22 @@
             const ip = entry.ip_address;
             let score = 0;
             
-            // זיהוי בוטים על פי IP
+            // זיהוי בוטים מתקדם ורחב
             if (ip) {
-                // Google Bots
-                if (ip.match(/^66\.249\./)) {
+                const ipAnalysis = analyzeIPAddress(ip);
+                
+                if (ipAnalysis.isBot) {
                     result.isBot = true;
-                    result.detectionMethods.push('Google Bot IP');
-                    score += 100;
-                }
-                // Facebook Bots
-                else if (ip.match(/^(173\.252\.|69\.171\.|31\.13\.|66\.220\.149\.)/)) {
-                    result.isBot = true;
-                    result.detectionMethods.push('Facebook Bot IP');
-                    score += 100;
-                }
-                // ISP ישראלי - סביר שמשתמש אמיתי
-                else if (ip.match(/^(2\.54\.|5\.28\.|5\.29\.|77\.127\.|77\.137\.|79\.177\.|141\.226\.|188\.64\.|185\.164\.|192\.114\.|207\.232\.|217\.194\.)/)) {
+                    result.detectionMethods.push(ipAnalysis.reason);
+                    score += ipAnalysis.confidence;
+                } else if (ipAnalysis.isHuman) {
                     result.isHuman = true;
-                    result.detectionMethods.push('Israeli ISP');
-                    score += 70;
+                    result.detectionMethods.push(ipAnalysis.reason);
+                    score += ipAnalysis.confidence;
+                } else if (ipAnalysis.isSuspicious) {
+                    result.isSuspicious = true;
+                    result.detectionMethods.push(ipAnalysis.reason);
+                    score += ipAnalysis.confidence;
                 }
             }
             
@@ -3067,6 +3082,902 @@
             }
         }
         
+        // זיהוי IP מתקדם ורחב
+        function analyzeIPAddress(ip) {
+            const result = {
+                isBot: false,
+                isHuman: false,
+                isSuspicious: false,
+                reason: '',
+                confidence: 0
+            };
+            
+            // זיהוי בוטי גוגל (מורחב)
+            const googleRanges = [
+                /^66\.249\./, /^66\.102\./, /^72\.14\./, /^209\.85\./, /^216\.239\./,
+                /^64\.233\./, /^74\.125\./, /^142\.250\./, /^172\.217\./, /^108\.177\./,
+                /^35\.186\./, /^35\.190\./, /^35\.201\./, /^35\.244\./
+            ];
+            
+            for (let pattern of googleRanges) {
+                if (ip.match(pattern)) {
+                    result.isBot = true;
+                    result.reason = 'Google Bot/Crawler';
+                    result.confidence = 100;
+                    return result;
+                }
+            }
+            
+            // זיהוי בוטי פייסבוק/מטא (מורחב משמעותית)
+            const facebookRanges = [
+                // רשתות פייסבוק עיקריות
+                /^173\.252\./, /^69\.171\./, /^31\.13\./, /^66\.220\.149\./,
+                /^69\.63\./, /^157\.240\./, /^185\.60\./, /^204\.15\./,
+                
+                // רשתות מטא נוספות
+                /^129\.134\./, /^179\.60\./, /^185\.89\./, /^199\.201\./,
+                /^104\.244\./, /^107\.178\./, /^108\.177\./, /^173\.252\./,
+                
+                // רשתות אירופאיות ואסיה-פסיפיק של פייסבוק
+                /^31\.13\./, /^66\.220\./, /^69\.171\./, /^173\.252\./,
+                /^185\.60\./, /^204\.15\./, /^31\.13\.24\./, /^31\.13\.25\./,
+                /^31\.13\.64\./, /^31\.13\.65\./, /^31\.13\.66\./, /^31\.13\.67\./,
+                /^31\.13\.68\./, /^31\.13\.69\./, /^31\.13\.70\./, /^31\.13\.71\./,
+                /^31\.13\.72\./, /^31\.13\.73\./, /^31\.13\.74\./, /^31\.13\.75\./,
+                /^31\.13\.76\./, /^31\.13\.77\./, /^31\.13\.78\./, /^31\.13\.79\./,
+                /^31\.13\.80\./, /^31\.13\.81\./, /^31\.13\.82\./, /^31\.13\.83\./,
+                /^31\.13\.84\./, /^31\.13\.85\./, /^31\.13\.86\./, /^31\.13\.87\./,
+                
+                // רשתות WhatsApp Business API
+                /^31\.13\.103\./, /^31\.13\.115\./, /^31\.13\.127\./,
+                /^69\.171\.230\./, /^69\.171\.231\./, /^69\.171\.234\./,
+                /^69\.171\.249\./, /^69\.63\.184\./, /^69\.63\.189\./,
+                /^173\.252\.69\./, /^173\.252\.70\./, /^173\.252\.79\./,
+                /^173\.252\.82\./, /^173\.252\.83\./, /^173\.252\.87\./,
+                /^173\.252\.95\./, /^173\.252\.107\./, /^173\.252\.127\./,
+                
+                // רשתות CDN ומטמון של פייסבוק
+                /^66\.220\.149\./, /^66\.220\.144\./, /^66\.220\.145\./,
+                /^66\.220\.146\./, /^66\.220\.147\./, /^66\.220\.148\./,
+                
+                // רשתות Instagram
+                /^54\.230\./, /^52\.84\./, /^54\.192\./, /^99\.86\./,
+                
+                // רשתות חדשות של Meta
+                /^162\.125\./, /^199\.96\./, /^208\.43\./, /^69\.147\./,
+                /^74\.119\./, /^103\.4\./, /^129\.134\./, /^157\.240\./,
+                /^163\.70\./, /^179\.60\./, /^185\.89\./, /^204\.15\./
+            ];
+            
+            for (let pattern of facebookRanges) {
+                if (ip.match(pattern)) {
+                    result.isBot = true;
+                    result.reason = 'Facebook/Meta/WhatsApp Bot';
+                    result.confidence = 98;
+                    return result;
+                }
+            }
+            
+            // זיהוי בוטי WhatsApp ספציפיים
+            const whatsappRanges = [
+                /^157\.240\./, /^31\.13\./, /^169\.45\./, /^158\.85\./,
+                /^169\.47\./, /^169\.48\./, /^169\.53\./, /^169\.54\./,
+                /^169\.55\./, /^169\.56\./, /^169\.57\./, /^169\.58\./,
+                /^169\.59\./, /^169\.60\./, /^169\.61\./, /^169\.62\./,
+                /^75\.126\./, /^108\.168\./, /^18\.194\./, /^18\.195\./
+            ];
+            
+            for (let pattern of whatsappRanges) {
+                if (ip.match(pattern)) {
+                    result.isBot = true;
+                    result.reason = 'WhatsApp Business Bot';
+                    result.confidence = 96;
+                    return result;
+                }
+            }
+            
+            // זיהוי בוטים נוספים
+            // Microsoft/Bing
+            if (ip.match(/^(40\.|52\.|13\.|20\.|65\.52\.|207\.46\.)/)) {
+                result.isBot = true;
+                result.reason = 'Microsoft/Bing Bot';
+                result.confidence = 95;
+                return result;
+            }
+            
+            // Amazon/AWS (חשוד להיות בוט)
+            if (ip.match(/^(54\.|3\.|52\.|18\.|34\.|13\.)/)) {
+                result.isSuspicious = true;
+                result.reason = 'AWS/Cloud Server (Suspicious)';
+                result.confidence = 70;
+                return result;
+            }
+            
+            // WhatsApp Business API servers
+            if (ip.match(/^(31\.13\.|173\.252\.|69\.171\.|102\.132\.|157\.240\.)/) &&
+                entry && entry.query_params && entry.query_params.ref && 
+                entry.query_params.ref.includes('whatsapp')) {
+                result.isBot = true;
+                result.reason = 'WhatsApp Business Bot';
+                result.confidence = 90;
+                return result;
+            }
+            
+            // זיהוי ספקי אינטרנט ישראליים (משתמשים אמיתיים)
+            const israeliISPs = [
+                /^2\.54\./, /^5\.28\./, /^5\.29\./, /^77\.124\./, /^77\.125\./, /^77\.126\./, /^77\.127\./,
+                /^79\.177\./, /^79\.178\./, /^79\.179\./, /^79\.180\./, /^79\.181\./,
+                /^85\.250\./, /^87\.69\./, /^87\.70\./, /^87\.71\./,
+                /^109\.248\./, /^141\.226\./, /^147\.235\./, /^149\.106\./,
+                /^176\.228\./, /^176\.229\./, /^176\.230\./, /^176\.231\./,
+                /^185\.164\./, /^188\.64\./, /^192\.114\./, /^192\.115\./,
+                /^195\.123\./, /^207\.232\./, /^212\.179\./, /^213\.57\./,
+                /^217\.194\./
+            ];
+            
+            for (let pattern of israeliISPs) {
+                if (ip.match(pattern)) {
+                    result.isHuman = true;
+                    result.reason = 'Israeli ISP';
+                    result.confidence = 75;
+                    return result;
+                }
+            }
+            
+            // דפוסי IP חשודים נוספים
+            
+            // IP עם יותר מדי zeros (דפוס בוטים)
+            if (ip.match(/\.0\.0\./) || ip.match(/\.0\.\d{1,3}\.0$/)) {
+                result.isSuspicious = true;
+                result.reason = 'Suspicious IP Pattern (Zeros)';
+                result.confidence = 60;
+                return result;
+            }
+            
+            // IP עם דפוסים חוזרים
+            const parts = ip.split('.');
+            if (parts.length === 4) {
+                const uniqueParts = [...new Set(parts)];
+                if (uniqueParts.length <= 2) {
+                    result.isSuspicious = true;
+                    result.reason = 'Repetitive IP Pattern';
+                    result.confidence = 50;
+                    return result;
+                }
+            }
+            
+            // זיהוי ספקי VPN/Proxy נפוצים
+            const vpnRanges = [
+                /^46\.246\./, /^91\.207\./, /^178\.62\./, /^134\.195\./,
+                /^199\.180\./, /^208\.167\./, /^162\.213\./, /^104\.168\./
+            ];
+            
+            for (let pattern of vpnRanges) {
+                if (ip.match(pattern)) {
+                    result.isSuspicious = true;
+                    result.reason = 'VPN/Proxy Service';
+                    result.confidence = 65;
+                    return result;
+                }
+            }
+            
+            // IP לא מזוהה - ניתוח נוסף
+            result.reason = 'Unknown IP Origin';
+            result.confidence = 30;
+            return result;
+        }
+        
+        // שילוב תוצאות ניתוח IP והתנהגות
+        function combineAnalysisResults(ipAnalysis, behaviorAnalysis) {
+            const combined = {
+                isBot: false,
+                isHuman: false,
+                isSuspicious: false,
+                detectionMethods: [...ipAnalysis.detectionMethods],
+                confidence: ipAnalysis.confidence,
+                ip: ipAnalysis.ip,
+                timestamp: ipAnalysis.timestamp,
+                source: ipAnalysis.source
+            };
+            
+            // הוספת תוצאות ניתוח ההתנהגות
+            if (behaviorAnalysis.reasons) {
+                combined.detectionMethods.push(...behaviorAnalysis.reasons);
+            }
+            
+            // לוגיקת החלטה משולבת
+            if (ipAnalysis.isBot || behaviorAnalysis.isBot) {
+                combined.isBot = true;
+                combined.confidence = Math.max(ipAnalysis.confidence, behaviorAnalysis.confidence);
+            } else if (ipAnalysis.isHuman || behaviorAnalysis.isHuman) {
+                // אם יש סימן לבוט בהתנהגות אבל IP אנושי - נותן ציון נמוך יותר
+                if (behaviorAnalysis.isBot) {
+                    combined.isSuspicious = true;
+                    combined.confidence = 60;
+                } else {
+                    combined.isHuman = true;
+                    combined.confidence = Math.max(ipAnalysis.confidence, behaviorAnalysis.confidence);
+                }
+            } else {
+                combined.isSuspicious = true;
+                combined.confidence = Math.max(ipAnalysis.confidence, behaviorAnalysis.confidence);
+            }
+            
+            return combined;
+        }
+
+        // בדיקה מתקדמת של התנהגות
+        function analyzeBehaviorPatterns(entry, type, phoneNumber, allEntriesForPhone) {
+            const behaviorScore = {
+                isBot: false,
+                isHuman: false,
+                reasons: [],
+                confidence: 0
+            };
+            
+            // בדיקת תדירות גישות מאותו IP
+            if (allEntriesForPhone) {
+                const sameIPCount = allEntriesForPhone.filter(e => 
+                    e.ip_address === entry.ip_address
+                ).length;
+                
+                if (sameIPCount > 10) {
+                    behaviorScore.isBot = true;
+                    behaviorScore.reasons.push(`Multiple requests from same IP (${sameIPCount})`);
+                    behaviorScore.confidence += 80;
+                }
+            }
+            
+            // בדיקת דפוס זמנים
+            if (entry.timestamp) {
+                const date = new Date(entry.timestamp);
+                const hour = date.getHours();
+                const minute = date.getMinutes();
+                const second = date.getSeconds();
+                
+                // בוטים לעיתים פועלים בזמנים עגולים
+                if (minute === 0 && second === 0) {
+                    behaviorScore.isBot = true;
+                    behaviorScore.reasons.push('Exact hour timing (Bot pattern)');
+                    behaviorScore.confidence += 40;
+                }
+                
+                // בוטים פועלים לעיתים בשעות לא טבעיות
+                if (hour >= 2 && hour <= 5) {
+                    behaviorScore.isBot = true;
+                    behaviorScore.reasons.push('Night hours activity (Bot pattern)');
+                    behaviorScore.confidence += 30;
+                }
+            }
+            
+            // ניתוח מתקדם של fbclid ופרמטרי פייסבוק
+            const fbAnalysis = analyzeFacebookParameters(entry);
+            if (fbAnalysis.isBot) {
+                behaviorScore.isBot = true;
+                behaviorScore.reasons.push(...fbAnalysis.reasons);
+                behaviorScore.confidence += fbAnalysis.confidence;
+            } else if (fbAnalysis.isHuman) {
+                behaviorScore.isHuman = true;
+                behaviorScore.reasons.push(...fbAnalysis.reasons);
+                behaviorScore.confidence += fbAnalysis.confidence;
+            }
+            
+            // ניתוח referrer מתקדם
+            const referrerAnalysis = analyzeReferrerPatterns(entry);
+            if (referrerAnalysis.isBot) {
+                behaviorScore.isBot = true;
+                behaviorScore.reasons.push(...referrerAnalysis.reasons);
+                behaviorScore.confidence += referrerAnalysis.confidence;
+            } else if (referrerAnalysis.isHuman) {
+                behaviorScore.isHuman = true;
+                behaviorScore.reasons.push(...referrerAnalysis.reasons);
+                behaviorScore.confidence += referrerAnalysis.confidence;
+            }
+            
+            // ניתוח מתקדם של לחיצות WhatsApp
+            const whatsappAnalysis = analyzeWhatsAppPatterns(entry, type, allEntriesForPhone);
+            if (whatsappAnalysis.isBot) {
+                behaviorScore.isBot = true;
+                behaviorScore.reasons.push(...whatsappAnalysis.reasons);
+                behaviorScore.confidence += whatsappAnalysis.confidence;
+            } else if (whatsappAnalysis.isHuman) {
+                behaviorScore.isHuman = true;
+                behaviorScore.reasons.push(...whatsappAnalysis.reasons);
+                behaviorScore.confidence += whatsappAnalysis.confidence;
+            }
+            
+            // לחיצה על יעד אמיתי (WhatsApp/טלפון) - בדיקה בסיסית נוספת
+            if (type === 'click' && entry.destination && 
+                ['whatsapp', 'telephone'].includes(entry.destination) && 
+                !whatsappAnalysis.isBot) {
+                behaviorScore.isHuman = true;
+                behaviorScore.reasons.push(`Real action: ${entry.destination}`);
+                behaviorScore.confidence += 30; // ציון נמוך יותר כי כבר נעשה ניתוח מפורט
+            }
+            
+            return behaviorScore;
+        }
+
+        // ניתוח פרמטרי פייסבוק מתקדם ומורחב עם התמחות בבוטים
+        function analyzeFacebookParameters(entry) {
+            const result = {
+                isBot: false,
+                isHuman: false,
+                reasons: [],
+                confidence: 0
+            };
+            
+            if (!entry.query_params) return result;
+            
+            let score = 0;
+            const fbclid = entry.query_params.fbclid;
+            
+            if (fbclid) {
+                // בדיקת אורך מפורטת
+                if (fbclid.length < 20) {
+                    result.isBot = true;
+                    result.reasons.push('Facebook Click ID too short (likely fake)');
+                    score += 90;
+                    return result;
+                } else if (fbclid.length > 200) {
+                    result.isBot = true;
+                    result.reasons.push('Facebook Click ID too long (likely malformed)');
+                    score += 80;
+                    return result;
+                }
+                
+                // בדיקת דפוסי fbclid מתקדמת ומרובת רובדים
+                const validPrefixes = [
+                    'IwZXh0bgNhZW0',    // דפוס תקני דסקטופ
+                    'IwY2xjaw',         // דפוס מובייל iOS
+                    'IwYGxsZW',         // דפוס מובייל Android
+                    'IwAR',             // דפוס ישן/legacy
+                    'PAAb',             // דפוס מערכת פרסום
+                    'ARB',              // דפוס Business Manager
+                    'PAA',              // דפוס אפליקציה פייסבוק
+                    'IwBB',             // דפוס browser bridge
+                    'VwB',              // דפוס video bridge
+                    'IwCR',             // דפוס Creator Studio
+                    'IwPG',             // דפוס Page Posts
+                    'IwEV',             // דפוס Events
+                    'IwGR',             // דפוס Groups
+                    'IwMP',             // דפוס Marketplace
+                    'IwSH',             // דפוס Stories/Shares
+                    'IwWA',             // דפוס WhatsApp integration
+                    'IwIG'              // דפוס Instagram integration
+                ];
+                
+                let validPrefixFound = false;
+                for (const prefix of validPrefixes) {
+                    if (fbclid.startsWith(prefix)) {
+                        validPrefixFound = true;
+                        result.isHuman = true;
+                        result.reasons.push(`Valid Facebook Click ID: ${prefix} pattern`);
+                        score += 85;
+                        break;
+                    }
+                }
+                
+                if (!validPrefixFound) {
+                    // בדיקת דפוסים חשודים
+                    if (fbclid.match(/^[0-9]+$/)) {
+                        result.isBot = true;
+                        result.reasons.push('Fake Facebook Click ID (numbers only)');
+                        score += 95;
+                        return result;
+                    } else if (fbclid.match(/^[a-z]+$/)) {
+                        result.isBot = true;
+                        result.reasons.push('Fake Facebook Click ID (lowercase only)');
+                        score += 85;
+                        return result;
+                    } else if (fbclid.match(/^[A-Z]+$/)) {
+                        result.isBot = true;
+                        result.reasons.push('Fake Facebook Click ID (uppercase only)');
+                        score += 85;
+                        return result;
+                    } else if (fbclid.includes('test') || fbclid.includes('bot') || 
+                              fbclid.includes('debug') || fbclid.includes('fake')) {
+                        result.isBot = true;
+                        result.reasons.push('Test/Debug Facebook Click ID');
+                        score += 98;
+                        return result;
+                    } else if (fbclid.includes('=') || fbclid.includes('&') || 
+                              fbclid.includes('/') || fbclid.includes('?')) {
+                        result.isBot = true;
+                        result.reasons.push('Malformed Facebook Click ID (invalid chars)');
+                        score += 90;
+                        return result;
+                    } else if (!/^[A-Za-z0-9_-]+$/.test(fbclid)) {
+                        result.isBot = true;
+                        result.reasons.push('Invalid characters in Facebook Click ID');
+                        score += 90;
+                        return result;
+                    } else {
+                        // לא מזוהה אבל בסיסית תקין
+                        result.isHuman = true;
+                        result.reasons.push('Unrecognized but valid Facebook Click ID format');
+                        score += 60;
+                    }
+                }
+                
+                // בדיקת עקביות עם referrer
+                if (entry.referrer) {
+                    const referrer = entry.referrer.toLowerCase();
+                    const facebookDomains = [
+                        'facebook.com', 'fb.com', 'm.facebook.com', 
+                        'mobile.facebook.com', 'touch.facebook.com', 
+                        'web.facebook.com', 'mbasic.facebook.com',
+                        'l.facebook.com', 'lm.facebook.com'
+                    ];
+                    
+                    if (facebookDomains.some(domain => referrer.includes(domain))) {
+                        if (result.isHuman && !result.isBot) {
+                            score += 20; // תמיכה נוספת
+                            result.reasons.push('Consistent Facebook referrer with Click ID');
+                        }
+                    } else if (referrer.includes('instagram.com')) {
+                        // פרסום מאינסטגרם עם fbclid - תקין
+                        if (result.isHuman && !result.isBot) {
+                            score += 15;
+                            result.reasons.push('Instagram referrer with Facebook Click ID');
+                        }
+                    } else {
+                        // fbclid ללא referrer פייסבוק - חשוד מאוד
+                        result.isBot = true;
+                        result.reasons.push('Facebook Click ID without Facebook/Instagram referrer');
+                        score += 85;
+                        return result;
+                    }
+                } else {
+                    // אין referrer אבל יש fbclid - חשוד
+                    result.isBot = true;
+                    result.reasons.push('Facebook Click ID without any referrer');
+                    score += 75;
+                    return result;
+                }
+                
+            }
+            
+            // בדיקת פרמטרי ref מתקדמת
+            if (entry.query_params.ref) {
+                const ref = entry.query_params.ref;
+                
+                // בוטים נוטים להשתמש ב-ref פשוטים ובולטים
+                const suspiciousRefs = ['facebook', 'fb', 'social', 'bot', 'test', 'auto'];
+                if (suspiciousRefs.includes(ref.toLowerCase())) {
+                    result.isBot = true;
+                    result.reasons.push(`Suspicious ref parameter: ${ref}`);
+                    score += 70;
+                    return result;
+                }
+                
+                // ref תקינים מפייסבוק
+                const validRefPatterns = [
+                    /facebook\.com/,
+                    /m\.facebook\.com/,
+                    /l\.facebook\.com/,
+                    /lm\.facebook\.com/,
+                    /share/,
+                    /messenger/
+                ];
+                
+                if (validRefPatterns.some(pattern => pattern.test(ref))) {
+                    result.isHuman = true;
+                    result.reasons.push(`Valid Facebook ref: ${ref}`);
+                    score += 15;
+                }
+            }
+            
+            // בדיקת פרמטרי UTM מתקדמת
+            const utm_source = entry.query_params.utm_source;
+            const utm_medium = entry.query_params.utm_medium;
+            const utm_campaign = entry.query_params.utm_campaign;
+            
+            if (utm_source) {
+                const source = utm_source.toLowerCase();
+                
+                // בדיקת utm_source תקין
+                if (['facebook', 'fb', 'facebook.com', 'social', 'meta'].includes(source)) {
+                    if (!fbclid && source !== 'social') {
+                        // utm_source פייסבוק ללא fbclid - חשוד
+                        result.isBot = true;
+                        result.reasons.push('Facebook UTM source without Click ID');
+                        score += 80;
+                        return result;
+                    } else if (fbclid) {
+                        // עקביות טובה
+                        score += 15;
+                        result.reasons.push('Consistent Facebook UTM and Click ID');
+                    }
+                }
+            }
+            
+            if (utm_medium) {
+                const medium = utm_medium.toLowerCase();
+                
+                // בדיקת utm_medium תקין
+                const validMediums = ['social', 'cpc', 'facebook', 'organic', 'referral'];
+                if (validMediums.includes(medium) && fbclid) {
+                    score += 10;
+                    result.reasons.push('Valid Facebook UTM medium');
+                }
+            }
+            
+            // בדיקת פרמטרי Meta/Facebook נוספים
+            const metaParams = [
+                'fb_source', 'fb_ref', 'fb_action_ids', 'fb_action_types',
+                'ig_rid', 'ig_cache_key', 'fb_dtsg', '__tn__', 'eid'
+            ];
+            
+            let hasMetaParams = false;
+            for (const param of metaParams) {
+                if (entry.query_params[param] !== undefined) {
+                    hasMetaParams = true;
+                    if (!fbclid) {
+                        result.isBot = true;
+                        result.reasons.push(`Facebook parameter ${param} without Click ID`);
+                        score += 75;
+                        return result;
+                    } else {
+                        score += 10;
+                        result.reasons.push('Additional Meta/Facebook parameters present');
+                        break;
+                    }
+                }
+            }
+            
+            // בדיקת פרמטרי בוט גלויים
+            const explicitBotParams = [
+                'bot', 'crawler', 'spider', 'scraper', 'test', 'debug',
+                'automated', 'bulk', 'mass', 'script', 'headless'
+            ];
+            
+            for (const botParam of explicitBotParams) {
+                if (entry.query_params[botParam] !== undefined || 
+                    Object.keys(entry.query_params).some(key => key.toLowerCase().includes(botParam)) ||
+                    Object.values(entry.query_params).some(value => 
+                        typeof value === 'string' && value.toLowerCase().includes(botParam))) {
+                    result.isBot = true;
+                    result.reasons.push(`Explicit bot parameter detected: ${botParam}`);
+                    score += 95;
+                    return result;
+                }
+            }
+            
+            // בדיקת עודף פרמטרים - בוטים לעיתים מוסיפים יותר מדי
+            const paramCount = Object.keys(entry.query_params).length;
+            if (paramCount > 15) {
+                result.isBot = true;
+                result.reasons.push('Excessive parameters count (bot-like)');
+                score += 70;
+            } else if (paramCount === 0 && !fbclid) {
+                result.isBot = true;
+                result.reasons.push('No parameters at all (suspicious)');
+                score += 60;
+            }
+            
+            // בדיקת פרמטרים עם ערכים ריקים - טכניקת בוטים
+            const emptyParams = Object.entries(entry.query_params).filter(([key, value]) => 
+                value === '' || value === null || value === undefined);
+            if (emptyParams.length > 2) {
+                result.isBot = true;
+                result.reasons.push('Multiple empty parameters (bot technique)');
+                score += 65;
+            }
+            
+            result.confidence = Math.min(score, 100);
+            return result;
+        }
+
+        // ניתוח דפוסי referrer
+        function analyzeReferrerPatterns(entry) {
+            const result = {
+                isBot: false,
+                isHuman: false,
+                reasons: [],
+                confidence: 0
+            };
+            
+            const referrer = entry.referrer;
+            
+            if (!referrer) {
+                // אין referrer - לא בהכרח בוט, אבל חשוד
+                if (!entry.query_params || !entry.query_params.fbclid) {
+                    result.isBot = true;
+                    result.reasons.push('No referrer and no fbclid');
+                    result.confidence = 60;
+                }
+                return result;
+            }
+            
+            // בדיקת referrers של פייסבוק
+            const facebookDomains = [
+                'facebook.com', 'm.facebook.com', 'l.facebook.com', 'lm.facebook.com',
+                'www.facebook.com', 'touch.facebook.com', 'mobile.facebook.com'
+            ];
+            
+            let isFacebookReferrer = false;
+            for (let domain of facebookDomains) {
+                if (referrer.includes(domain)) {
+                    isFacebookReferrer = true;
+                    result.isHuman = true;
+                    result.reasons.push(`Valid Facebook referrer: ${domain}`);
+                    result.confidence = 70;
+                    break;
+                }
+            }
+            
+            // דפוסי referrer חשודים
+            if (referrer.includes('bot') || referrer.includes('crawler') || 
+                referrer.includes('spider') || referrer.includes('scraper')) {
+                result.isBot = true;
+                result.reasons.push('Bot-related referrer');
+                result.confidence = 90;
+                return result;
+            }
+            
+            // referrer ריק או כללי מדי
+            if (referrer === 'https://' || referrer === 'http://' || referrer.length < 10) {
+                result.isBot = true;
+                result.reasons.push('Invalid or empty referrer');
+                result.confidence = 70;
+                return result;
+            }
+            
+            // בדיקת consistency - אם יש fbclid אבל אין referrer של פייסבוק
+            if (entry.query_params && entry.query_params.fbclid && !isFacebookReferrer) {
+                result.isBot = true;
+                result.reasons.push('fbclid without Facebook referrer (inconsistent)');
+                result.confidence = 80;
+            }
+            
+            return result;
+        }
+
+        // זיהוי דפוסי בוטים של WhatsApp Business מתקדם ומורחב
+        function analyzeWhatsAppPatterns(entry, type, allEntries) {
+            const result = {
+                isBot: false,
+                isHuman: false,
+                reasons: [],
+                confidence: 0
+            };
+            
+            let score = 0;
+            
+            // זיהוי IP WhatsApp ספציפי
+            if (entry.ip_address) {
+                const ipAnalysis = analyzeIPAddress(entry.ip_address);
+                if (ipAnalysis.reason && ipAnalysis.reason.includes('WhatsApp')) {
+                    result.isBot = true;
+                    result.reasons.push('WhatsApp Business API IP detected');
+                    score += 95;
+                    return result;
+                }
+            }
+            
+            // בדיקת פרמטרי WhatsApp ספציפיים
+            if (entry.query_params) {
+                const params = entry.query_params;
+                
+                // פרמטרים מפייסבוק עם יעד WhatsApp - חשוד
+                if (params.fbclid && type === 'click' && entry.destination === 'whatsapp') {
+                    // בדרך כלל פייסבוק לא שולח fbclid ללחיצות WhatsApp ישירות
+                    result.isBot = true;
+                    result.reasons.push('Facebook Click ID with WhatsApp destination (suspicious)');
+                    score += 80;
+                    return result;
+                }
+                
+                // פרמטרי WhatsApp Business מפורשים
+                const whatsappBusinessParams = [
+                    'wa_btn_id', 'wa_ref', 'wa_source', 'wa_click_id',
+                    'whatsapp_source', 'wb_ref', 'business_id'
+                ];
+                
+                for (const param of whatsappBusinessParams) {
+                    if (params[param] !== undefined) {
+                        if (type === 'click' && entry.destination === 'whatsapp') {
+                            result.isHuman = true;
+                            result.reasons.push(`Valid WhatsApp Business parameter: ${param}`);
+                            score += 20;
+                        } else {
+                            result.isBot = true;
+                            result.reasons.push(`WhatsApp parameter without WhatsApp action: ${param}`);
+                            score += 75;
+                        }
+                    }
+                }
+                
+                // בדיקת פרמטרי אוטומציה
+                const automationParams = [
+                    'automated', 'bulk_message', 'mass_send', 'bot_id',
+                    'script_ref', 'auto_reply', 'broadcast_id'
+                ];
+                
+                for (const autoParam of automationParams) {
+                    if (params[autoParam] !== undefined || 
+                        Object.keys(params).some(key => key.toLowerCase().includes(autoParam)) ||
+                        Object.values(params).some(value => 
+                            typeof value === 'string' && value.toLowerCase().includes(autoParam))) {
+                        result.isBot = true;
+                        result.reasons.push(`WhatsApp automation parameter detected: ${autoParam}`);
+                        score += 90;
+                        return result;
+                    }
+                }
+            }
+            
+            // אם זה לחיצה על WhatsApp - ניתוח מתקדם
+            if (type === 'click' && entry.destination === 'whatsapp') {
+                
+                // בדיקת דפוס זמנים מתקדם עם סטטיסטיקות מורכבות
+                if (allEntries && allEntries.length > 1) {
+                    const whatsappClicks = allEntries.filter(e => 
+                        e.destination === 'whatsapp' && e.ip_address === entry.ip_address
+                    ).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                    
+                    if (whatsappClicks.length >= 3) {
+                        // חישוב פרק זמן מפורט
+                        const timeDiffs = [];
+                        const timestamps = whatsappClicks.map(click => new Date(click.timestamp));
+                        
+                        for (let i = 1; i < timestamps.length; i++) {
+                            const diff = timestamps[i] - timestamps[i-1];
+                            timeDiffs.push(diff);
+                        }
+                        
+                        if (timeDiffs.length > 0) {
+                            const avgDiff = timeDiffs.reduce((a, b) => a + b, 0) / timeDiffs.length;
+                            const variance = timeDiffs.reduce((sum, diff) => 
+                                sum + Math.pow(diff - avgDiff, 2), 0) / timeDiffs.length;
+                            const stdDev = Math.sqrt(variance);
+                            const coefficient = stdDev / avgDiff; // מקדם וריאציה
+                            
+                            // דפוס קבוע מדי - בוט
+                            if (coefficient < 0.2 && avgDiff < 300000) { // פחות מ-5 דקות בפער קבוע
+                                result.isBot = true;
+                                result.reasons.push('Highly regular WhatsApp click timing (bot pattern)');
+                                score += 85;
+                                return result;
+                            }
+                            
+                            // דפוס מהיר מדי
+                            if (avgDiff < 30000) { // פחות מ-30 שניות בממוצע
+                                result.isBot = true;
+                                result.reasons.push('Too fast WhatsApp click pattern');
+                                score += 90;
+                                return result;
+                            }
+                            
+                            // דפוס לילי חשוד (בוטים פועלים בלילה)
+                            const nightClicks = timestamps.filter(time => {
+                                const hour = time.getHours();
+                                return hour >= 1 && hour <= 5; // 1:00-5:00 לילה
+                            });
+                            
+                            if (nightClicks.length > whatsappClicks.length * 0.7) {
+                                result.isBot = true;
+                                result.reasons.push('Excessive night-time WhatsApp activity');
+                                score += 80;
+                                return result;
+                            }
+                        }
+                    }
+                    
+                    // בדיקת תדירות יומית - בוטים עם דפוס חוזר
+                    if (whatsappClicks.length > 10) {
+                        const dailyPattern = {};
+                        whatsappClicks.forEach(click => {
+                            const date = new Date(click.timestamp).toDateString();
+                            dailyPattern[date] = (dailyPattern[date] || 0) + 1;
+                        });
+                        
+                        const dailyCounts = Object.values(dailyPattern);
+                        const avgDaily = dailyCounts.reduce((a, b) => a + b, 0) / dailyCounts.length;
+                        
+                        // אם יש תדירות קבועה מדי ליום
+                        const regularDays = dailyCounts.filter(count => 
+                            Math.abs(count - avgDaily) < 2).length;
+                        
+                        if (regularDays > dailyCounts.length * 0.8 && avgDaily > 5) {
+                            result.isBot = true;
+                            result.reasons.push('Regular daily WhatsApp activity pattern');
+                            score += 75;
+                            return result;
+                        }
+                    }
+                }
+                
+                // בדיקת referrer עם יעד WhatsApp
+                if (entry.referrer) {
+                    const referrer = entry.referrer.toLowerCase();
+                    
+                    // referrer מפייסבוק ללחיצת WhatsApp - יכול להיות לגיטימי
+                    if (referrer.includes('facebook.com') || referrer.includes('fb.com')) {
+                        result.isHuman = true;
+                        result.reasons.push('Facebook referrer to WhatsApp click');
+                        score += 15;
+                    }
+                    
+                    // referrer חשוד
+                    if (referrer.includes('whatsapp-bot') || referrer.includes('wa-auto') ||
+                        referrer.includes('bulk-wa') || referrer.includes('mass-whatsapp')) {
+                        result.isBot = true;
+                        result.reasons.push('Suspicious WhatsApp automation referrer');
+                        score += 95;
+                        return result;
+                    }
+                } else {
+                    // אין referrer ללחיצת WhatsApp - קצת חשוד
+                    score += 20;
+                    result.reasons.push('WhatsApp click without referrer');
+                }
+                
+                // בדיקת User Agent עם לחיצת WhatsApp
+                if (entry.user_agent) {
+                    const ua = entry.user_agent.toLowerCase();
+                    
+                    // WhatsApp Business API משתמש בדרך כלל ב-User Agents ספציפיים
+                    if (ua.includes('whatsapp') && (ua.includes('business') || ua.includes('api'))) {
+                        result.isBot = true;
+                        result.reasons.push('WhatsApp Business API User Agent');
+                        score += 90;
+                        return result;
+                    }
+                    
+                    // User Agents חשודים עם WhatsApp
+                    if ((ua.includes('python') || ua.includes('curl') || ua.includes('wget')) &&
+                        type === 'click' && entry.destination === 'whatsapp') {
+                        result.isBot = true;
+                        result.reasons.push('Script-based WhatsApp click');
+                        score += 88;
+                        return result;
+                    }
+                }
+                
+                // לחיצה אמיתית על WhatsApp - תמיכה בסיסית
+                if (score < 30) { // אם לא נמצאו דפוסים חשודים
+                    result.isHuman = true;
+                    result.reasons.push('Genuine WhatsApp click');
+                    score += 65;
+                }
+                
+            } else if (entry.destination === 'whatsapp' && type !== 'click') {
+                // גישה ל-WhatsApp ללא לחיצה - חשוד
+                result.isBot = true;
+                result.reasons.push('WhatsApp access without click action');
+                score += 70;
+            }
+            
+            // בדיקת שילוב עם פעילות נוספת מאותו IP
+            if (allEntries && entry.ip_address) {
+                const sameIPEntries = allEntries.filter(e => 
+                    e.ip_address === entry.ip_address && e !== entry
+                );
+                
+                if (sameIPEntries.length > 0) {
+                    // בדיקה האם יש פעילות מגוונת או רק WhatsApp
+                    const uniqueDestinations = [...new Set(sameIPEntries.map(e => e.destination))];
+                    const whatsappOnlyRatio = sameIPEntries.filter(e => 
+                        e.destination === 'whatsapp').length / sameIPEntries.length;
+                    
+                    if (whatsappOnlyRatio > 0.9 && sameIPEntries.length > 5) {
+                        result.isBot = true;
+                        result.reasons.push('IP focused exclusively on WhatsApp (suspicious)');
+                        score += 85;
+                    } else if (uniqueDestinations.length > 3) {
+                        // פעילות מגוונת - סימן לאדם אמיתי
+                        score += 10;
+                        result.reasons.push('Diverse activity pattern from same IP');
+                    }
+                }
+            }
+            
+            result.confidence = Math.min(score, 100);
+            return result;
+        }
+
         // יצירת המלצות מתקדמות
         function generateAdvancedRecommendations(botCount, humanCount, totalEntries, phoneStats) {
             const recommendations = [];
@@ -3125,83 +4036,105 @@
         function displayAnalysisResults(results) {
             const contentDiv = document.getElementById('analysisContent');
             
+            // תחילה נוסיף CSS לטבלאות הנפתחות
+            addCollapsibleStyles();
+            
             let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    
-                    <!-- סיכום כללי -->
-                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
-                        <h4 style="color: #4CAF50; margin-bottom: 15px;">📊 סיכום כללי</h4>
-                        <div style="text-align: right;">
-                            <div>📈 סה"כ רשומות: <strong>${results.summary.totalEntries.toLocaleString()}</strong></div>
-                            <div>🤖 בוטים: <strong>${results.summary.botCount.toLocaleString()}</strong> (${results.summary.botPercentage}%)</div>
-                            <div>👥 בני אדם: <strong>${results.summary.humanCount.toLocaleString()}</strong> (${results.summary.humanPercentage}%)</div>
-                            <div>❓ לא ברור: <strong>${results.summary.unknownCount.toLocaleString()}</strong></div>
-                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
-                                <div>👆 סה"כ קליקים: <strong>${results.summary.totalClicks.toLocaleString()}</strong></div>
-                                <div>⚠️ פעילויות חשודות: <strong>${results.summary.suspiciousActivities.toLocaleString()}</strong></div>
-                                <div>⚖️ יחס בוט:אדם = <strong>1:${results.summary.botToHumanRatio}</strong></div>
-                            </div>
+                <!-- סיכום כללי עליון -->
+                <div style="background: linear-gradient(135deg, #4CAF50, #45a049); color: white; padding: 25px; border-radius: 15px; margin-bottom: 20px; text-align: center;">
+                    <h3 style="margin: 0 0 20px 0;">📊 דוח ניתוח בוטים מתקדם</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: center;">
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold;">${results.summary.totalEntries.toLocaleString()}</div>
+                            <div style="opacity: 0.9;">סה"כ רשומות</div>
                         </div>
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #ff6b6b;">${results.summary.botCount.toLocaleString()}</div>
+                            <div style="opacity: 0.9;">בוטים (${(results.summary.botRatio || 0)}%)</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #4ecdc4;">${results.summary.humanCount.toLocaleString()}</div>
+                            <div style="opacity: 0.9;">בני אדם (${(results.summary.humanRatio || 0)}%)</div>
+                        </div>
+                        ${results.summary.totalClicks !== undefined ? `
+                        <div>
+                            <div style="font-size: 2em; font-weight: bold; color: #ffd93d;">${results.summary.totalClicks.toLocaleString()}</div>
+                            <div style="opacity: 0.9;">קליקים</div>
+                        </div>
+                        ` : ''}
                     </div>
+                </div>
 
-                    <!-- גרף עוגה -->
-                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
-                        <h4 style="color: #FF9800; margin-bottom: 15px;">🥧 התפלגות</h4>
-                        <div style="position: relative; height: 200px;">
-                            ${createPieChart(results.summary)}
-                        </div>
+                <!-- גרף עוגה -->
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin-bottom: 20px; text-align: center;">
+                    <h4 style="color: #FF9800; margin-bottom: 15px;">🥧 התפלגות תנועה</h4>
+                    <div style="position: relative; height: 200px;">
+                        ${createAdvancedPieChart(results.summary)}
                     </div>
+                </div>
+                
+                <!-- טבלאות נתונים מפורטות -->
+                <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
             `;
 
-            // הוספת התפלגויות אם קיימות
-            if (results.distributions) {
-                // מכשירים
-                if (Object.keys(results.distributions.deviceTypes).length > 0) {
-                    html += `
-                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
-                            <h4 style="color: #2196F3; margin-bottom: 15px;">📱 סוגי מכשירים</h4>
-                            ${createDistributionList(results.distributions.deviceTypes)}
-                        </div>
-                    `;
-                }
+            // טבלת מספרי טלפון
+            if (results.phoneNumberStats) {
+                html += createCollapsibleSection(
+                    'phone-stats', 
+                    '📞 ניתוח לפי מספר טלפון', 
+                    createPhoneStatsTable(results.phoneNumberStats)
+                );
+            }
 
-                // User Agents מובילים
-                if (Object.keys(results.distributions.userAgents).length > 0) {
-                    html += `
-                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
-                            <h4 style="color: #9C27B0; margin-bottom: 15px;">🌐 User Agents מובילים</h4>
-                            ${createDistributionList(results.distributions.userAgents, 5)}
-                        </div>
-                    `;
-                }
+            // טבלת כתובות IP
+            if (results.ipAnalysis) {
+                html += createCollapsibleSection(
+                    'ip-analysis', 
+                    '🌐 ניתוח כתובות IP', 
+                    createIPAnalysisTable(results.ipAnalysis)
+                );
+            }
 
-                // התפלגות זמן
-                if (Object.keys(results.distributions.timeDistribution).length > 0) {
-                    html += `
-                        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px;">
-                            <h4 style="color: #607D8B; margin-bottom: 15px;">🕐 התפלגות לפי שעות</h4>
-                            ${createTimeDistribution(results.distributions.timeDistribution)}
-                        </div>
-                    `;
-                }
+            // טבלת יעדי לחיצות
+            if (results.clickDestinations) {
+                html += createCollapsibleSection(
+                    'click-destinations', 
+                    '🎯 יעדי לחיצות', 
+                    createClickDestinationsTable(results.clickDestinations)
+                );
+            }
+
+            // טבלת מקורות תנועה
+            if (results.sourceAnalysis) {
+                html += createCollapsibleSection(
+                    'source-analysis', 
+                    '📊 מקורות תנועה', 
+                    createSourceAnalysisTable(results.sourceAnalysis)
+                );
+            }
+
+            // התפלגות זמנים
+            if (results.timeDistribution) {
+                html += createCollapsibleSection(
+                    'time-distribution', 
+                    '🕐 התפלגות לפי שעות', 
+                    createTimeDistributionChart(results.timeDistribution)
+                );
             }
 
             // המלצות
             if (results.recommendations && results.recommendations.length > 0) {
                 html += `
-                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; grid-column: 1 / -1;">
-                        <h4 style="color: #FFC107; margin-bottom: 15px;">💡 המלצות</h4>
+                    <div style="background: rgba(255,193,7,0.2); border: 1px solid #FFC107; padding: 20px; border-radius: 10px; margin-top: 20px;">
+                        <h4 style="color: #FFC107; margin-bottom: 15px;">💡 המלצות מערכת</h4>
                         <ul style="text-align: right; list-style: none; padding: 0;">
                 `;
                 
                 results.recommendations.forEach(rec => {
-                    html += `<li style="margin: 10px 0; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 5px;">${rec}</li>`;
+                    html += `<li style="margin: 10px 0; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px; border-right: 4px solid #FFC107;">${rec}</li>`;
                 });
                 
-                html += `
-                        </ul>
-                    </div>
-                `;
+                html += `</ul></div>`;
             }
 
             html += `</div>`;
@@ -3209,6 +4142,374 @@
             contentDiv.innerHTML = html;
             
             console.log('✅ Analysis complete:', results);
+        }
+
+        // הוספת סגנונות לטבלאות נפתחות
+        function addCollapsibleStyles() {
+            if (document.getElementById('collapsible-styles')) return;
+            
+            const style = document.createElement('style');
+            style.id = 'collapsible-styles';
+            style.textContent = `
+                .collapsible-header {
+                    background: rgba(255,255,255,0.15);
+                    color: white;
+                    cursor: pointer;
+                    padding: 15px 20px;
+                    border: none;
+                    border-radius: 10px;
+                    text-align: right;
+                    outline: none;
+                    font-size: 16px;
+                    font-weight: bold;
+                    transition: all 0.3s ease;
+                    width: 100%;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                
+                .collapsible-header:hover {
+                    background: rgba(255,255,255,0.25);
+                    transform: translateY(-2px);
+                }
+                
+                .collapsible-header.active {
+                    background: rgba(255,255,255,0.2);
+                    border-bottom-left-radius: 0;
+                    border-bottom-right-radius: 0;
+                }
+                
+                .collapsible-content {
+                    max-height: 0;
+                    overflow: hidden;
+                    transition: max-height 0.3s ease;
+                    background: rgba(255,255,255,0.05);
+                    border-radius: 0 0 10px 10px;
+                }
+                
+                .collapsible-content.active {
+                    max-height: 1000px;
+                    padding: 20px;
+                }
+                
+                .data-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 10px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+                
+                .data-table th,
+                .data-table td {
+                    padding: 12px 15px;
+                    text-align: right;
+                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                }
+                
+                .data-table th {
+                    background: rgba(255,255,255,0.2);
+                    font-weight: bold;
+                    color: #ffd700;
+                }
+                
+                .data-table tr:hover {
+                    background: rgba(255,255,255,0.1);
+                }
+                
+                .bot-indicator {
+                    background: #ff6b6b;
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.8em;
+                }
+                
+                .human-indicator {
+                    background: #4ecdc4;
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.8em;
+                }
+                
+                .suspicious-indicator {
+                    background: #ffa726;
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 12px;
+                    font-size: 0.8em;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        // יצירת סעיף נפתח
+        function createCollapsibleSection(id, title, content) {
+            return `
+                <div style="margin-bottom: 15px;">
+                    <button class="collapsible-header" onclick="toggleCollapsible('${id}')">
+                        <span>${title}</span>
+                        <span id="${id}-icon">▼</span>
+                    </button>
+                    <div id="${id}" class="collapsible-content">
+                        ${content}
+                    </div>
+                </div>
+            `;
+        }
+
+        // פונקציית פתיחה/סגירת סעיפים
+        function toggleCollapsible(id) {
+            const content = document.getElementById(id);
+            const icon = document.getElementById(id + '-icon');
+            const header = content.previousElementSibling;
+            
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                header.classList.remove('active');
+                icon.textContent = '▼';
+            } else {
+                content.classList.add('active');
+                header.classList.add('active');
+                icon.textContent = '▲';
+            }
+        }
+
+        // יצירת טבלת מספרי טלפון
+        function createPhoneStatsTable(phoneStats) {
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>מספר טלפון</th>
+                            <th>סה"כ קליקים</th>
+                            <th>בקשות כללי</th>
+                            <th>בוטים</th>
+                            <th>בני אדם</th>
+                            <th>חשודים</th>
+                            <th>% בוטים</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            Object.entries(phoneStats)
+                .sort((a, b) => (b[1].clicks + b[1].nonClicks) - (a[1].clicks + a[1].nonClicks))
+                .forEach(([phone, stats]) => {
+                    const total = stats.clicks + stats.nonClicks;
+                    const botPercentage = total > 0 ? ((stats.bots / total) * 100).toFixed(1) : '0';
+                    
+                    html += `
+                        <tr>
+                            <td><strong>${phone}</strong></td>
+                            <td>${stats.clicks.toLocaleString()}</td>
+                            <td>${stats.nonClicks.toLocaleString()}</td>
+                            <td><span class="bot-indicator">${stats.bots}</span></td>
+                            <td><span class="human-indicator">${stats.humans}</span></td>
+                            <td><span class="suspicious-indicator">${stats.suspicious}</span></td>
+                            <td><strong>${botPercentage}%</strong></td>
+                        </tr>
+                    `;
+                });
+            
+            html += `</tbody></table>`;
+            return html;
+        }
+
+        // יצירת טבלת ניתוח IP
+        function createIPAnalysisTable(ipAnalysis) {
+            let html = `
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>כתובת IP</th>
+                                <th>מספר בקשות</th>
+                                <th>סוג</th>
+                                <th>סטטוס</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            Object.entries(ipAnalysis)
+                .sort((a, b) => b[1].count - a[1].count)
+                .slice(0, 50) // הצגת 50 הראשונים
+                .forEach(([ip, data]) => {
+                    const status = data.isBot ? 'bot-indicator' : data.isHuman ? 'human-indicator' : 'suspicious-indicator';
+                    const statusText = data.isBot ? 'בוט' : data.isHuman ? 'אנושי' : 'חשוד';
+                    
+                    html += `
+                        <tr>
+                            <td><code>${ip}</code></td>
+                            <td>${data.count.toLocaleString()}</td>
+                            <td>${getIPProvider(ip)}</td>
+                            <td><span class="${status}">${statusText}</span></td>
+                        </tr>
+                    `;
+                });
+            
+            html += `</tbody></table></div>`;
+            return html;
+        }
+
+        // זיהוי ספק IP
+        function getIPProvider(ip) {
+            if (ip.match(/^66\.249\./)) return 'Google Bot';
+            if (ip.match(/^(173\.252\.|69\.171\.|31\.13\.)/)) return 'Facebook Bot';
+            if (ip.match(/^(40\.|52\.|13\.|20\.)/)) return 'Microsoft';
+            if (ip.match(/^(2\.54\.|5\.28\.|77\.127\.)/)) return 'ספק ישראלי';
+            if (ip.match(/^(54\.|3\.|18\.)/)) return 'AWS Cloud';
+            return 'לא מזוהה';
+        }
+
+        // יצירת טבלת יעדי לחיצות
+        function createClickDestinationsTable(destinations) {
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>יעד לחיצה</th>
+                            <th>מספר לחיצות</th>
+                            <th>אחוז</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const total = Object.values(destinations).reduce((sum, count) => sum + count, 0);
+            
+            Object.entries(destinations)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([destination, count]) => {
+                    const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0';
+                    const icon = destination === 'whatsapp' ? '💬' : destination === 'telephone' ? '📞' : '🔗';
+                    
+                    html += `
+                        <tr>
+                            <td>${icon} ${destination}</td>
+                            <td><strong>${count.toLocaleString()}</strong></td>
+                            <td>${percentage}%</td>
+                        </tr>
+                    `;
+                });
+            
+            html += `</tbody></table>`;
+            return html;
+        }
+
+        // יצירת טבלת מקורות תנועה
+        function createSourceAnalysisTable(sources) {
+            let html = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>מקור תנועה</th>
+                            <th>מספר בקשות</th>
+                            <th>אחוז</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            const total = Object.values(sources).reduce((sum, count) => sum + count, 0);
+            
+            Object.entries(sources)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 20) // הצגת 20 הראשונים
+                .forEach(([source, count]) => {
+                    const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : '0';
+                    const displaySource = source.length > 50 ? source.substring(0, 47) + '...' : source;
+                    
+                    html += `
+                        <tr>
+                            <td>${displaySource || 'גישה ישירה'}</td>
+                            <td><strong>${count.toLocaleString()}</strong></td>
+                            <td>${percentage}%</td>
+                        </tr>
+                    `;
+                });
+            
+            html += `</tbody></table>`;
+            return html;
+        }
+
+        // יצירת גרף התפלגות זמנים
+        function createTimeDistributionChart(timeDistribution) {
+            const maxCount = Math.max(...Object.values(timeDistribution));
+            
+            let html = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; max-width: 800px; margin: 0 auto;">
+            `;
+            
+            for (let hour = 0; hour < 24; hour++) {
+                const count = timeDistribution[hour] || 0;
+                const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                const intensity = maxCount > 0 ? (count / maxCount) : 0;
+                
+                html += `
+                    <div style="text-align: center;">
+                        <div style="height: 80px; display: flex; align-items: end; justify-content: center;">
+                            <div style="
+                                width: 20px; 
+                                height: ${height}%; 
+                                background: rgba(76, 175, 80, ${0.3 + intensity * 0.7}); 
+                                border-radius: 3px 3px 0 0;
+                                transition: all 0.3s ease;
+                            " title="${hour}:00 - ${count} בקשות"></div>
+                        </div>
+                        <div style="font-size: 11px; margin-top: 5px;">${hour}</div>
+                        <div style="font-size: 10px; color: #ccc;">${count}</div>
+                    </div>
+                `;
+            }
+            
+            html += `</div></div>`;
+            return html;
+        }
+
+        // יצירת גרף עוגה מתקדם
+        function createAdvancedPieChart(summary) {
+            const total = summary.botCount + summary.humanCount + (summary.unknownCount || 0);
+            if (total === 0) return '<div style="color: #ccc;">אין נתונים להצגה</div>';
+
+            const botPerc = (summary.botCount / total) * 100;
+            const humanPerc = (summary.humanCount / total) * 100;
+            const unknownPerc = ((summary.unknownCount || 0) / total) * 100;
+            
+            return `
+                <div style="display: flex; justify-content: center; align-items: center; gap: 30px; flex-wrap: wrap;">
+                    <div style="width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(
+                        #ff6b6b 0deg ${botPerc * 3.6}deg,
+                        #4ecdc4 ${botPerc * 3.6}deg ${(botPerc + humanPerc) * 3.6}deg,
+                        #ffa726 ${(botPerc + humanPerc) * 3.6}deg 360deg
+                    ); position: relative; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(255,255,255,0.9); color: #333; width: 70px; height: 70px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">
+                            ${total.toLocaleString()}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 20px; height: 20px; background: #ff6b6b; border-radius: 50%; display: inline-block;"></span>
+                            <span>בוטים: ${summary.botCount.toLocaleString()} (${botPerc.toFixed(1)}%)</span>
+                        </div>
+                        <div style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 20px; height: 20px; background: #4ecdc4; border-radius: 50%; display: inline-block;"></span>
+                            <span>בני אדם: ${summary.humanCount.toLocaleString()} (${humanPerc.toFixed(1)}%)</span>
+                        </div>
+                        ${summary.unknownCount ? `
+                        <div style="margin: 8px 0; display: flex; align-items: center; gap: 10px;">
+                            <span style="width: 20px; height: 20px; background: #ffa726; border-radius: 50%; display: inline-block;"></span>
+                            <span>לא מזוהה: ${summary.unknownCount.toLocaleString()} (${unknownPerc.toFixed(1)}%)</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
         }
 
         // יצירת עוגה פשוטה (CSS)
