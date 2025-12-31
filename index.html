@@ -1187,32 +1187,99 @@
             
             alert(summary);
         }
-        
+
+        // קבלת מקור מאירוע
+        function getSourceFromEvent(event) {
+            if (event.utm_params && event.utm_params.utm_source) {
+                return event.utm_params.utm_source;
+            }
+            if (event.url) {
+                const url = new URL(event.url);
+                const utmSource = url.searchParams.get('utm_source');
+                if (utmSource) return utmSource;
+            }
+            if (event.referrer && event.referrer !== '') {
+                try {
+                    return new URL(event.referrer).hostname;
+                } catch (e) {
+                    return 'רפרר לא ידוע';
+                }
+            }
+            return 'גישה ישירה';
+        }
+
+        // קבלת UTM מאירוע
+        function getUTMFromEvent(event) {
+            if (event.utm_params && event.utm_params.utm_campaign) {
+                return event.utm_params.utm_campaign;
+            }
+            if (event.url) {
+                const url = new URL(event.url);
+                const utmCampaign = url.searchParams.get('utm_campaign');
+                if (utmCampaign) return utmCampaign;
+            }
+            return 'ללא UTM';
+        }
+
+        // סיכום UTM
+        function getUTMSummary() {
+            const data = localStorage.getItem('custom_analytics');
+            const analyticsData = data ? JSON.parse(data) : [];
+            const campaigns = {};
+            
+            analyticsData.forEach(event => {
+                const campaign = getUTMFromEvent(event);
+                if (campaign && campaign !== 'ללא UTM') {
+                    if (!campaigns[campaign]) {
+                        campaigns[campaign] = { visits: 0, bots: 0 };
+                    }
+                    campaigns[campaign].visits++;
+                    if (event.bot_score > 50) {
+                        campaigns[campaign].bots++;
+                    }
+                }
+            });
+            
+            return campaigns;
+        }
+
+        // ניתוח בוטים
+        function getBotAnalysis() {
+            const data = localStorage.getItem('custom_analytics');
+            const analyticsData = data ? JSON.parse(data) : [];
+            
+            const botEvents = analyticsData.filter(e => 
+                e.type === 'bot_detection' && e.bot_score !== undefined
+            );
+            
+            const analysis = {
+                total_detections: botEvents.length,
+                confirmed_bots: botEvents.filter(e => e.bot_score >= 70).length,
+                suspicious: botEvents.filter(e => e.bot_score >= 40 && e.bot_score < 70).length,
+                likely_humans: botEvents.filter(e => e.bot_score < 40).length,
+                avg_bot_score: botEvents.length > 0 
+                    ? Math.round(botEvents.reduce((sum, e) => sum + e.bot_score, 0) / botEvents.length)
+                    : 0
+            };
+            
+            return analysis;
+        }
+
         // הפעלה אוטומטית
-        window.onload = () => {
-            // הגדרת מידע בסיסי
-            document.getElementById('visit-time').textContent = new Date().toLocaleString('he-IL');
-            document.getElementById('session-id').textContent = sessionId.substring(0, 16) + '...';
-            document.getElementById('visitor-id').textContent = visitorId.substring(0, 16) + '...';
-            document.getElementById('screen-size').textContent = screen.width + 'x' + screen.height;
-            
-            // יצירת טביעת אצבע
-            deviceFingerprint = createDeviceFingerprint();
-            document.getElementById('device-fingerprint').textContent = deviceFingerprint;
-            
+        window.onload = async () => {
             // ניתוח מקור הגעה
             analyzeReferrer();
-            
-            // זיהוי דפדפן
-            detectBrowser();
             
             // קריאת פרמטרי UTM
             parseUTMParams();
             
-            // הפעלת זיהוי בוטים
+            // הפעלת זיהוי מתקדם
             detectAdvancedBot();
             
-            // שליחת אירוע עמוד נטען
+            // הפעלת מעקב התנהגות
+            initBehaviorTracking();
+            
+            // שליחת אירוע עמוד נטען למערכת שלנו
             logAnalyticsEvent('page_view', {
                 'page_title': document.title,
                 'user_agent': navigator.userAgent,
@@ -1222,21 +1289,11 @@
                 'utm_params': parseUTMParams()
             });
             
-            // מונה זמן על הדף
-            setInterval(() => {
-                const timeOnPage = Math.floor((Date.now() - startTime) / 1000);
-                document.getElementById('time-on-page').textContent = timeOnPage + ' שניות';
-            }, 1000);
+            // עדכון סטטיסטיקות ראשוני
+            updateRealTimeStatsDisplay();
             
-            // טעינת נתונים קיימים
-            const existingData = localStorage.getItem('custom_analytics');
-            if (existingData) {
-                analyticsData = JSON.parse(existingData);
-                // עיבוד נתונים קיימים
-                analyticsData.forEach(event => {
-                    processAnalyticsData(event);
-                });
-            }
+            // הוספה ראשונית לציר הזמן
+            addToTimeline('page_view', {page_title: document.title});
             
             console.log('🚀 מערכת זיהוי בוטים מתקדמת הופעלה בהצלחה!');
         };
