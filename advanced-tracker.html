@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת זיהוי בוטים מתקדמת - ללא תלות חיצונית</title>
+    
+    <!-- FingerprintJS Pro for advanced device fingerprinting -->
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"></script>
+    
+    <!-- BotD for bot detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@fingerprintjs/botd@1/dist/botd.min.js"></script>
+    
+    <!-- Device Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/bowser@2.11.0/es5.min.js"></script>
+    
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .visitor-info {
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: right;
+        }
+        
+        .visitor-info h3 {
+            margin-top: 0;
+            color: #ffd700;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .info-value {
+            color: #e0e0e0;
+            max-width: 60%;
+            word-break: break-word;
+        }
+        
+        .advanced-detection {
+            background: rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .detection-score {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 15px 0;
+        }
+        
+        .confidence-bar {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .high-confidence { background: linear-gradient(90deg, #4CAF50, #81C784); }
+        .medium-confidence { background: linear-gradient(90deg, #ff9800, #ffb74d); }
+        .low-confidence { background: linear-gradient(90deg, #f44336, #ef5350); }
+        
+        .bot-indicator {
+            font-size: 1.3em;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        
+        .human {
+            background: rgba(0, 255, 0, 0.2);
+            border: 2px solid #00ff00;
+        }
+        
+        .suspicious {
+            background: rgba(255, 165, 0, 0.2);
+            border: 2px solid #ffa500;
+        }
+        
+        .bot {
+            background: rgba(255, 0, 0, 0.2);
+            border: 2px solid #ff0000;
+        }
+        
+        .analytics-section {
+            text-align: right;
+            font-size: 0.9em;
+            color: #b8d4f0;
+            margin: 10px 0;
+        }
+        
+        .real-time-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            margin-top: 5px;
+            color: #e0e0e0;
+        }
+        
+        .button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.3s ease;
+        }
+        
+        .button:hover {
+            transform: scale(1.05);
+        }
+        
+        .source-analysis {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: right;
+        }
+        
+        .source-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .source-name {
+            font-weight: bold;
+            color: #ffd700;
+        }
+        
+        .source-count {
+            color: #4CAF50;
+        }
+        
+        .session-timeline {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .timeline-item {
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 0.9em;
+            text-align: right;
+        }
+        
+        .timeline-time {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .warning {
+            background: rgba(255, 152, 0, 0.2);
+            border: 2px solid #ff9800;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #fff;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .real-time-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ מערכת זיהוי בוטים מתקדמת</h1>
+        <p style="font-size: 1.1em; margin-bottom: 20px; color: #b8d4f0;">
+            מערכת זיהוי עצמאית ומתקדמת ללא תלות בשירותי צד שלישי
+        </p>
+        
+        <div class="dashboard-grid">
+            <!-- מידע על המבקר -->
+            <div class="card">
+                <div class="visitor-info">
+                    <h3>🕵️ מידע מבקר נוכחי</h3>
+                    <div class="info-row">
+                        <span class="info-label">זמן כניסה:</span>
+                        <span class="info-value" id="visit-time"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">מזהה מבקר:</span>
+                        <span class="info-value" id="visitor-id">יוצר...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">מזהה סשן:</span>
+                        <span class="info-value" id="session-id"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">טביעת אצבע מכשיר:</span>
+                        <span class="info-value" id="device-fingerprint">יוצר...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">דפדפן:</span>
+                        <span class="info-value" id="browser-info">מזהה...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">מקור הגעה:</span>
+                        <span class="info-value" id="referrer-info">בודק...</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">גודל מסך:</span>
+                        <span class="info-value" id="screen-size"></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">זמן על הדף:</span>
+                        <span class="info-value" id="time-on-page">0 שניות</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- זיהוי בוטים מתקדם -->
+            <div class="card">
+                <div class="advanced-detection">
+                    <h3 style="color: #ffd700; margin-bottom: 15px;">🤖 תוצאות זיהוי</h3>
+                    
+                    <div id="bot-detection" class="bot-indicator">
+                        🔍 מריץ בדיקות מתקדמות...
+                    </div>
+                    
+                    <div class="detection-score">
+                        <span>רמת אמינות: </span>
+                        <span id="confidence-score" style="color: #4CAF50;">חושב...</span>
+                    </div>
+                    
+                    <div class="confidence-bar">
+                        <div id="confidence-fill" class="confidence-fill high-confidence" style="width: 0%"></div>
+                    </div>
+                    
+                    <div id="advanced-results">
+                        <div class="analytics-section">🔬 מריץ בדיקות מתקדמות...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- סטטיסטיקות זמן אמת -->
+        <div class="card">
+            <h3 style="color: #ffd700; margin-bottom: 20px;">📊 סטטיסטיקות זמן אמת</h3>
+            <div class="real-time-stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-visitors">1</div>
+                    <div class="stat-label">מבקרים בסשן</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="bot-detections">0</div>
+                    <div class="stat-label">בוטים זוהו</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="suspicious-activities">0</div>
+                    <div class="stat-label">פעילויות חשודות</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="button-clicks">0</div>
+                    <div class="stat-label">לחיצות כפתורים</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="mouse-movements">0</div>
+                    <div class="stat-label">תנועות עכבר</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="page-interactions">0</div>
+                    <div class="stat-label">אינטראקציות</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid">
+            <!-- ניתוח מקורות -->
+            <div class="card">
+                <h3 style="color: #ffd700; margin-bottom: 15px;">🌐 ניתוח מקורות תנועה</h3>
+                <div class="source-analysis" id="source-analysis">
+                    <div class="source-item">
+                        <span class="source-name">טוען נתונים...</span>
+                        <span class="source-count">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ציר זמן של הסשן -->
+            <div class="card">
+                <h3 style="color: #ffd700; margin-bottom: 15px;">⏱️ ציר זמן הסשן</h3>
+                <div class="session-timeline" id="session-timeline">
+                    <div class="timeline-item">
+                        <span class="timeline-time">התחלת סשן</span> - מערכת מתחילה
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- פרמטרי UTM -->
+        <div class="card">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">🔗 פרמטרי מעקב (UTM)</h3>
+            <div id="utm-params" style="text-align: right; font-family: monospace; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;"></div>
+        </div>
+        
+        <!-- בדיקות אינטראקציה -->
+        <div class="card">
+            <h3 style="color: #ffd700; margin-bottom: 15px;">🔬 בדיקות אינטראקציה</h3>
+            <button class="button" onclick="trackButtonClick('test_button_1')">🖱️ בדיקת לחיצה</button>
+            <button class="button" onclick="trackMouseMovement()">🐭 מעקב עכבר</button>
+            <button class="button" onclick="trackScrollBehavior()">📜 בדיקת גלילה</button>
+            <button class="button" onclick="startAdvancedBehaviorTest()">🧪 בדיקה מתקדמת</button>
+        </div>
+        
+        <!-- אזהרות -->
+        <div id="warnings-container"></div>
+    </div>
+
+    <script>
+        // משתנים גלובליים למערכת Analytics המותאמת
+        let deviceFingerprint = null;
+        let botDetectionResult = null;
+        let browserInfo = null;
+        let sessionId = generateSessionId();
+        let visitorId = getOrCreateVisitorId();
+        let analyticsData = [];
+        let realTimeStats = {
+            totalVisitors: 1,
+            botDetections: 0,
+            suspiciousActivities: 0,
+            buttonClicks: 0,
+            mouseMovements: 0,
+            pageInteractions: 0
+        };
+        let behaviorAnalysis = {
+            mouseMovements: [],
+            clicks: [],
+            scrollEvents: [],
+            keystrokes: [],
+            timings: []
+        };
+        let sourceTracking = {};
+        let sessionTimeline = [];
+        
+        // מערכת Analytics מותאמת - עצמאית לחלוטין
+        function logAnalyticsEvent(eventType, data) {
+            const event = {
+                type: eventType,
+                timestamp: Date.now(),
+                session_id: sessionId,
+                visitor_id: visitorId,
+                url: window.location.href,
+                referrer: document.referrer,
+                user_agent: navigator.userAgent,
+                screen_resolution: screen.width + 'x' + screen.height,
+                ...data
+            };
+            
+            // שמירה ב-localStorage
+            analyticsData.push(event);
+            if (analyticsData.length > 1000) {
+                analyticsData.shift(); // שמירה על 1000 אירועים אחרונים
+            }
+            localStorage.setItem('custom_analytics', JSON.stringify(analyticsData));
+            
+            // עדכון ציר הזמן
+            addToTimeline(eventType, data);
+            
+            // עיבוד נתונים מתקדם
+            processAnalyticsData(event);
+            
+            console.log('📊 Analytics Event:', event);
+        }
+        
+        // יצירת מזהה סשן ייחודי
+        function generateSessionId() {
+            return 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // קבלת או יצירת מזהה מבקר
+        function getOrCreateVisitorId() {
+            let vid = localStorage.getItem('visitor_id');
+            if (!vid) {
+                vid = 'visitor_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('visitor_id', vid);
+            }
+            return vid;
+        }
+        
+        function getSessionId() {
+            return sessionId;
+        }
+        
+        function getVisitorId() {
+            return visitorId;
+        }
+        
+        // עדכון סטטיסטיקות זמן אמת
+        function updateRealTimeStats(statType) {
+            if (realTimeStats[statType] !== undefined) {
+                realTimeStats[statType]++;
+                document.getElementById(statType.replace('_', '-')).textContent = realTimeStats[statType];
+            }
+        }
+        
+        // הוספה לציר הזמן
+        function addToTimeline(eventType, data) {
+            const time = new Date().toLocaleTimeString('he-IL');
+            let description = '';
+            
+            switch(eventType) {
+                case 'page_view':
+                    description = 'כניסה לדף';
+                    break;
+                case 'button_click':
+                    description = `לחיצה על כפתור: ${data.button_name}`;
+                    realTimeStats.pageInteractions++;
+                    break;
+                case 'mouse_movement':
+                    description = `תנועת עכבר (${data.move_count})`;
+                    if (data.move_count % 50 === 0) {
+                        realTimeStats.mouseMovements += 50;
+                    }
+                    break;
+                case 'suspicious_behavior':
+                    description = `התנהגות חשודה: ${data.patterns}`;
+                    realTimeStats.suspiciousActivities++;
+                    break;
+                case 'advanced_bot_detection':
+                case 'basic_bot_detection':
+                    if (data.bot_score > 50) {
+                        description = `זוהה בוט (ציון: ${data.bot_score})`;
+                        realTimeStats.botDetections++;
+                    } else {
+                        description = `זוהה משתמש אמיתי (ציון: ${data.bot_score})`;
+                    }
+                    break;
+                default:
+                    description = eventType;
+            }
+            
+            sessionTimeline.push({
+                time: time,
+                event: eventType,
+                description: description,
+                timestamp: Date.now()
+            });
+            
+            // שמירה על 20 אירועים אחרונים
+            if (sessionTimeline.length > 20) {
+                sessionTimeline.shift();
+            }
+            
+            updateTimelineDisplay();
+            updateRealTimeStatsDisplay();
+        }
+        
+        // עדכון תצוגת ציר הזמן
+        function updateTimelineDisplay() {
+            const timelineElement = document.getElementById('session-timeline');
+            timelineElement.innerHTML = '';
+            
+            sessionTimeline.slice().reverse().forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'timeline-item';
+                div.innerHTML = `
+                    <span class="timeline-time">${item.time}</span> - ${item.description}
+                `;
+                timelineElement.appendChild(div);
+            });
+        }
+        
+        // עדכון תצוגת סטטיסטיקות
+        function updateRealTimeStatsDisplay() {
+            Object.keys(realTimeStats).forEach(key => {
+                const elementId = key.replace(/([A-Z])/g, '-$1').toLowerCase();
+                const element = document.getElementById(elementId);
+                if (element) {
+                    element.textContent = realTimeStats[key];
+                }
+            });
+        }
+        
+        // עיבוד נתונים מתקדם
+        function processAnalyticsData(event) {
+            // ניתוח מקורות תנועה
+            analyzeTrafficSources(event);
+            
+            // זיהוי דפוסים חשודים
+            detectSuspiciousPatterns();
+            
+            // עדכון מטריקות
+            updateMetrics();
+        }
+        
+        // ניתוח מקורות תנועה
+        function analyzeTrafficSources(event) {
+            let source = 'direct';
+            
+            if (event.referrer) {
+                try {
+                    const referrerDomain = new URL(event.referrer).hostname;
+                    if (referrerDomain.includes('google')) source = 'google';
+                    else if (referrerDomain.includes('facebook')) source = 'facebook';
+                    else if (referrerDomain.includes('instagram')) source = 'instagram';
+                    else if (referrerDomain.includes('twitter')) source = 'twitter';
+                    else if (referrerDomain.includes('linkedin')) source = 'linkedin';
+                    else if (referrerDomain.includes('whatsapp')) source = 'whatsapp';
+                    else if (referrerDomain.includes('telegram')) source = 'telegram';
+                    else source = referrerDomain;
+                } catch (e) {
+                    source = 'unknown';
+                }
+            }
+            
+            // בדיקת פרמטרי UTM
+            const utmSource = new URLSearchParams(window.location.search).get('utm_source');
+            if (utmSource) {
+                source = utmSource;
+            }
+            
+            if (!sourceTracking[source]) {
+                sourceTracking[source] = 0;
+            }
+            sourceTracking[source]++;
+            
+            updateSourceDisplay();
+        }
+        
+        // עדכון תצוגת מקורות
+        function updateSourceDisplay() {
+            const sourceElement = document.getElementById('source-analysis');
+            sourceElement.innerHTML = '';
+            
+            Object.entries(sourceTracking)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([source, count]) => {
+                    const div = document.createElement('div');
+                    div.className = 'source-item';
+                    div.innerHTML = `
+                        <span class="source-name">${getSourceDisplayName(source)}</span>
+                        <span class="source-count">${count}</span>
+                    `;
+                    sourceElement.appendChild(div);
+                });
+        }
+        
+        // שמות תצוגה למקורות
+        function getSourceDisplayName(source) {
+            const names = {
+                'direct': '🔗 גישה ישירה',
+                'google': '🔍 גוגל',
+                'facebook': '📘 פייסבוק',
+                'instagram': '📷 אינסטגרם',
+                'twitter': '🐦 טוויטר',
+                'linkedin': '💼 לינקדאין',
+                'whatsapp': '💬 ווטסאפ',
+                'telegram': '✈️ טלגרם',
+                'unknown': '❓ לא ידוע'
+            };
+            return names[source] || `🌐 ${source}`;
+        }
+        
+        // זיהוי דפוסים חשודים
+        function detectSuspiciousPatterns() {
+            const recentEvents = analyticsData.filter(e => Date.now() - e.timestamp < 60000);
+            const warnings = [];
+            
+            // בדיקת לחיצות מהירות מדי
+            const clicks = recentEvents.filter(e => e.type === 'button_click');
+            if (clicks.length > 10) {
+                warnings.push('🚨 יותר מדי לחיצות בדקה אחרונה');
+            }
+            
+            // בדיקת חוסר אינטראקציה
+            const interactions = recentEvents.filter(e => 
+                ['button_click', 'mouse_movement', 'scroll_behavior'].includes(e.type)
+            );
+            if (recentEvents.length > 5 && interactions.length === 0) {
+                warnings.push('⚠️ פעילות ללא אינטראקציות משתמש');
+            }
+            
+            displayWarnings(warnings);
+        }
+        
+        // הצגת אזהרות
+        function displayWarnings(warnings) {
+            const warningsContainer = document.getElementById('warnings-container');
+            warningsContainer.innerHTML = '';
+            
+            warnings.forEach(warning => {
+                const div = document.createElement('div');
+                div.className = 'warning';
+                div.textContent = warning;
+                warningsContainer.appendChild(div);
+            });
+        }
+        
+        // חישוב ציון סיכון
+        function calculateRiskScore(patterns) {
+            let score = 0;
+            patterns.forEach(pattern => {
+                if (pattern.includes('מהיר')) score += 30;
+                if (pattern.includes('ליניארי')) score += 40;
+                if (pattern.includes('ללא')) score += 50;
+            });
+            return Math.min(score, 100);
+        }
+        
+        // מידע בסיסי על המבקר
+        document.getElementById('visit-time').textContent = new Date().toLocaleString('he-IL');
+        document.getElementById('session-id').textContent = sessionId.substring(0, 16) + '...';
+        document.getElementById('screen-size').textContent = screen.width + 'x' + screen.height;
+        
+        // מונה זמן על הדף
+        let startTime = Date.now();
+        setInterval(() => {
+            const timeOnPage = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('time-on-page').textContent = timeOnPage + ' שניות';
+        }, 1000);
+        
+        // ניתוח מקור הגעה
+        function analyzeReferrer() {
+            const referrer = document.referrer;
+            let referrerInfo = 'גישה ישירה';
+            
+            if (referrer) {
+                try {
+                    const url = new URL(referrer);
+                    referrerInfo = url.hostname;
+                } catch (e) {
+                    referrerInfo = 'מקור לא ידוע';
+                }
+            }
+            
+            document.getElementById('referrer-info').textContent = referrerInfo;
+            return referrerInfo;
+        }
+        
+        // זיהוי בוט מתקדם עם ספריות חיצוניות
+        async function initAdvancedDetection() {
+            try {
+                // FingerprintJS - טביעת אצבע מכשיר
+                const fp = await FingerprintJS.load();
+                const result = await fp.get();
+                deviceFingerprint = result.visitorId;
+                
+                document.getElementById('device-fingerprint').textContent = deviceFingerprint.substring(0, 16) + '...';
+                document.getElementById('visitor-id').textContent = visitorId.substring(0, 16) + '...';
+                
+                // BotD - זיהוי בוטים מתקדם
+                const botd = await BotdJS.load();
+                botDetectionResult = await botd.detect();
+                
+                // Browser Detection
+                if (typeof bowser !== 'undefined') {
+                    browserInfo = bowser.parse(navigator.userAgent);
+                    document.getElementById('browser-info').textContent = 
+                        `${browserInfo.browser.name} ${browserInfo.browser.version} (${browserInfo.os.name})`;
+                }
+                
+                // הפעלת זיהוי מתקדם
+                await runAdvancedBotDetection();
+                
+            } catch (error) {
+                console.error('שגיאה בזיהוי מתקדם:', error);
+                // fallback לזיהוי בסיסי
+                detectBot();
+            }
+        }
+        
+        // זיהוי בוט מתקדם
+        async function runAdvancedBotDetection() {
+            let botScore = 0;
+            let confidence = 100;
+            let reasons = [];
+            let detectionMethods = [];
+            
+            // 1. BotD Detection
+            if (botDetectionResult && botDetectionResult.bot) {
+                botScore += 70;
+                reasons.push('🤖 BotD: זוהה כבוט מתקדם');
+                detectionMethods.push('BotD Library');
+            }
+            
+            // 2. Advanced User Agent Analysis
+            const suspiciousUA = analyzeUserAgent();
+            if (suspiciousUA.isSuspicious) {
+                botScore += suspiciousUA.score;
+                reasons.push(`🕵️ User Agent חשוד: ${suspiciousUA.reason}`);
+                detectionMethods.push('UA Analysis');
+            }
+            
+            // 3. Browser Environment Checks
+            const envChecks = checkBrowserEnvironment();
+            botScore += envChecks.score;
+            reasons = reasons.concat(envChecks.reasons);
+            if (envChecks.reasons.length > 0) {
+                detectionMethods.push('Environment Check');
+            }
+            
+            // 4. Device Fingerprint Analysis
+            const fpAnalysis = analyzeFingerprint();
+            botScore += fpAnalysis.score;
+            reasons = reasons.concat(fpAnalysis.reasons);
+            if (fpAnalysis.reasons.length > 0) {
+                detectionMethods.push('Fingerprinting');
+            }
+            
+            // 5. Canvas & WebGL Analysis
+            const canvasAnalysis = analyzeCanvas();
+            botScore += canvasAnalysis.score;
+            reasons = reasons.concat(canvasAnalysis.reasons);
+            if (canvasAnalysis.reasons.length > 0) {
+                detectionMethods.push('Canvas Analysis');
+            }
+            
+            // חישוב ציון סופי ורמת ביטחון
+            botScore = Math.min(botScore, 100);
+            
+            if (botScore >= 70) {
+                confidence = 95;
+            } else if (botScore >= 40) {
+                confidence = 75;
+            } else if (botScore >= 20) {
+                confidence = 60;
+            } else {
+                confidence = 90;
+            }
+            
+            // עדכון ממשק המשתמש
+            updateAdvancedUI(botScore, confidence, reasons, detectionMethods);
+            
+            // שליחה למערכת Analytics המותאמת שלנו
+            logAnalyticsEvent('advanced_bot_detection', {
+                'bot_score': botScore,
+                'confidence': confidence,
+                'detection_methods': detectionMethods.join(','),
+                'device_fingerprint': deviceFingerprint,
+                'user_agent': navigator.userAgent,
+                'reasons': reasons.join(';')
+            });
+        }
+        
+        // ניתוח User Agent מתקדם
+        function analyzeUserAgent() {
+            const ua = navigator.userAgent;
+            let score = 0;
+            let reason = '';
+            
+            // רשימת bots ידועים
+            const knownBots = [
+                'googlebot', 'bingbot', 'slurp', 'duckduckbot', 'baiduspider',
+                'yandexbot', 'sogou', 'exabot', 'facebot', 'ia_archiver',
+                'crawler', 'spider', 'scraper', 'bot', 'headless', 'phantom',
+                'selenium', 'webdriver', 'automation', 'puppeteer', 'playwright'
+            ];
+            
+            const suspiciousPatterns = [
+                /python|curl|wget|java|perl|ruby/i,
+                /automated|script|tool/i,
+                /test|check|monitor/i
+            ];
+            
+            // בדיקת bots ידועים
+            const foundBot = knownBots.find(bot => ua.toLowerCase().includes(bot));
+            if (foundBot) {
+                score = 60;
+                reason = `נמצא bot ידוע: ${foundBot}`;
+            }
+            
+            // בדיקת דפוסים חשודים
+            const foundPattern = suspiciousPatterns.find(pattern => pattern.test(ua));
+            if (foundPattern && !foundBot) {
+                score = 40;
+                reason = 'דפוס חשוד ב-User Agent';
+            }
+            
+            // בדיקות נוספות
+            if (ua.length < 50) {
+                score += 20;
+                reason += ' | User Agent קצר מדי';
+            }
+            
+            return {
+                isSuspicious: score > 0,
+                score: Math.min(score, 60),
+                reason: reason
+            };
+        }
+        
+        // בדיקת סביבת הדפדפן
+        function checkBrowserEnvironment() {
+            let score = 0;
+            let reasons = [];
+            
+            // בדיקת WebDriver
+            if (navigator.webdriver) {
+                score += 50;
+                reasons.push('🚗 WebDriver זוהה');
+            }
+            
+            // בדיקת window properties חשודים
+            const suspiciousProps = [
+                'webdriver', '_phantom', 'callPhantom', '_selenium',
+                'selenium', 'domAutomation', 'domAutomationController'
+            ];
+            
+            suspiciousProps.forEach(prop => {
+                if (window[prop]) {
+                    score += 20;
+                    reasons.push(`⚠️ נמצא ${prop}`);
+                }
+            });
+            
+            // בדיקת plugins
+            if (navigator.plugins.length === 0) {
+                score += 15;
+                reasons.push('🔌 אין plugins');
+            }
+            
+            return {
+                score: Math.min(score, 50),
+                reasons: reasons
+            };
+        }
+        
+        // ניתוח טביעת אצבע
+        function analyzeFingerprint() {
+            let score = 0;
+            let reasons = [];
+            
+            // בדיקת רזולוציה
+            if (screen.width === 0 || screen.height === 0) {
+                score += 25;
+                reasons.push('📺 רזולוציית מסך לא תקינה');
+            }
+            
+            // בדיקת timezone
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (!timezone || timezone === 'UTC') {
+                score += 10;
+                reasons.push('🌍 אזור זמן חשוד');
+            }
+            
+            return {
+                score: Math.min(score, 30),
+                reasons: reasons
+            };
+        }
+        
+        // ניתוח Canvas
+        function analyzeCanvas() {
+            let score = 0;
+            let reasons = [];
+            
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // יצירת fingerprint canvas
+                ctx.textBaseline = 'top';
+                ctx.font = '14px Arial';
+                ctx.fillText('Bot Detection Test 🤖', 2, 2);
+                
+                const canvasData = canvas.toDataURL();
+                
+                // בדיקת canvas ריק
+                if (canvasData.length < 100) {
+                    score += 30;
+                    reasons.push('🖼️ Canvas ריק או חסום');
+                }
+                
+                // בדיקת תמיכה ב-WebGL
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (!gl) {
+                    score += 15;
+                    reasons.push('🎮 אין תמיכה ב-WebGL');
+                }
+                
+            } catch (e) {
+                score += 25;
+                reasons.push('🖼️ שגיאה ב-Canvas');
+            }
+            
+            return {
+                score: Math.min(score, 35),
+                reasons: reasons
+            };
+        }
+        
+        // עדכון UI מתקדם
+        function updateAdvancedUI(botScore, confidence, reasons, methods) {
+            const confidenceElement = document.getElementById('confidence-score');
+            const confidenceFill = document.getElementById('confidence-fill');
+            const resultsElement = document.getElementById('advanced-results');
+            const detectionElement = document.getElementById('bot-detection');
+            
+            confidenceElement.textContent = `${confidence}%`;
+            confidenceFill.style.width = `${confidence}%`;
+            
+            // צבעים לפי ציון
+            if (botScore >= 70) {
+                confidenceElement.style.color = '#f44336';
+                confidenceFill.className = 'confidence-fill low-confidence';
+                detectionElement.className = 'bot-indicator bot';
+                detectionElement.innerHTML = `🤖 זוהה כבוט (ציון: ${botScore}/100)`;
+            } else if (botScore >= 40) {
+                confidenceElement.style.color = '#ff9800';
+                confidenceFill.className = 'confidence-fill medium-confidence';
+                detectionElement.className = 'bot-indicator suspicious';
+                detectionElement.innerHTML = `⚠️ התנהגות חשודה (ציון: ${botScore}/100)`;
+            } else {
+                confidenceElement.style.color = '#4CAF50';
+                confidenceFill.className = 'confidence-fill high-confidence';
+                detectionElement.className = 'bot-indicator human';
+                detectionElement.innerHTML = `👤 משתמש אמיתי (ציון: ${botScore}/100)`;
+            }
+            
+            // תוצאות מפורטות
+            let resultsHTML = `
+                <div class="analytics-section">📊 ניקוד בוט: <strong>${botScore}/100</strong></div>
+                <div class="analytics-section">🔬 שיטות זיהוי: ${methods.join(', ')}</div>
+                <div class="analytics-section">🆔 מזהה מכשיר: ${deviceFingerprint ? deviceFingerprint.substring(0, 12) + '...' : 'לא זמין'}</div>
+                <div class="analytics-section">🕐 זמן זיהוי: ${new Date().toLocaleTimeString('he-IL')}</div>
+            `;
+            
+            if (reasons.length > 0) {
+                resultsHTML += '<div style="margin-top: 15px; text-align: right;"><strong>🔍 סיבות לחשד:</strong></div>';
+                reasons.forEach(reason => {
+                    resultsHTML += `<div class="analytics-section">${reason}</div>`;
+                });
+            }
+            
+            resultsElement.innerHTML = resultsHTML;
+        }
+        
+        // זיהוי בוט בסיסי (fallback)
+        function detectBot() {
+            let botScore = 0;
+            let reasons = [];
+            
+            const ua = navigator.userAgent.toLowerCase();
+            const botKeywords = ['bot', 'crawler', 'spider', 'scraper', 'headless'];
+            const foundBotKeywords = botKeywords.filter(keyword => ua.includes(keyword));
+            
+            if (foundBotKeywords.length > 0) {
+                botScore += 50;
+                reasons.push(`User Agent חשוד: ${foundBotKeywords.join(', ')}`);
+            }
+            
+            if (navigator.webdriver) {
+                botScore += 30;
+                reasons.push('WebDriver זוהה');
+            }
+            
+            if (screen.width === 0 || screen.height === 0) {
+                botScore += 25;
+                reasons.push('פתרון מסך לא תקין');
+            }
+            
+            const detectionElement = document.getElementById('bot-detection');
+            if (botScore >= 50) {
+                detectionElement.className = 'bot-indicator bot';
+                detectionElement.innerHTML = `🤖 כנראה בוט (ניקוד: ${botScore})`;
+            } else if (botScore >= 20) {
+                detectionElement.className = 'bot-indicator suspicious';
+                detectionElement.innerHTML = `⚠️ חשוד (ניקוד: ${botScore})`;
+            } else {
+                detectionElement.className = 'bot-indicator human';
+                detectionElement.innerHTML = `👤 כנראה אדם אמיתי (ניקוד: ${botScore})`;
+            }
+            
+            logAnalyticsEvent('basic_bot_detection', {
+                'bot_score': botScore,
+                'detection_reasons': reasons.join(';'),
+                'user_agent': navigator.userAgent
+            });
+        }
+        
+        // קריאת פרמטרי UTM
+        function parseUTMParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const utmParams = {};
+            
+            ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].forEach(param => {
+                if (urlParams.has(param)) {
+                    utmParams[param] = urlParams.get(param);
+                }
+            });
+            
+            const utmElement = document.getElementById('utm-params');
+            if (Object.keys(utmParams).length > 0) {
+                utmElement.innerHTML = Object.entries(utmParams)
+                    .map(([key, value]) => `<strong style="color: #ffd700;">${key}:</strong> ${value}`)
+                    .join('<br>');
+            } else {
+                utmElement.innerHTML = '<span style="color: #ff9800;">❌ לא התקבלו פרמטרי UTM</span>';
+            }
+            
+            return utmParams;
+        }
+        
+        // מעקב אחרי לחיצות כפתורים
+        function trackButtonClick(buttonName) {
+            logAnalyticsEvent('button_click', {
+                'button_name': buttonName,
+                'page_url': window.location.href
+            });
+            
+            updateRealTimeStats('buttonClicks');
+            alert('לחיצה נרשמה במערכת Analytics המותאמת שלנו!');
+        }
+        
+        // מעקב אחרי תנועת עכבר
+        let mouseMoveCount = 0;
+        function trackMouseMovement() {
+            const handler = (e) => {
+                mouseMoveCount++;
+                if (mouseMoveCount % 10 === 0) {
+                    logAnalyticsEvent('mouse_movement', {
+                        'move_count': mouseMoveCount,
+                        'x': e.clientX,
+                        'y': e.clientY
+                    });
+                }
+            };
+            
+            document.addEventListener('mousemove', handler);
+            alert('מעקב אחרי העכבר הופעל! זוז את העכבר וראה שזה נרשם במערכת שלנו');
+            
+            setTimeout(() => {
+                document.removeEventListener('mousemove', handler);
+                alert(`נרשמו ${mouseMoveCount} תנועות עכבר במערכת Analytics המותאמת`);
+            }, 10000);
+        }
+        
+        // מעקב אחרי גלילה
+        function trackScrollBehavior() {
+            let scrollCount = 0;
+            const handler = () => {
+                scrollCount++;
+                if (scrollCount % 5 === 0) {
+                    logAnalyticsEvent('scroll_behavior', {
+                        'scroll_count': scrollCount,
+                        'scroll_position': window.pageYOffset
+                    });
+                }
+            };
+            
+            window.addEventListener('scroll', handler);
+            alert('מעקב אחרי הגלילה הופעל! תגלול כדי לראות שזה נרשם');
+            
+            setTimeout(() => {
+                window.removeEventListener('scroll', handler);
+                alert(`נרשמו ${scrollCount} גלילות במערכת שלנו`);
+            }, 10000);
+        }
+        
+        // בדיקה מתקדמת של התנהגות
+        function startAdvancedBehaviorTest() {
+            alert('🧪 בדיקה מתקדמת החלה! בצע פעולות שונות במשך 10 שניות הבאות');
+            
+            let testData = {
+                mouseEvents: 0,
+                clickEvents: 0,
+                scrollEvents: 0
+            };
+            
+            const mouseHandler = () => testData.mouseEvents++;
+            const clickHandler = () => testData.clickEvents++;
+            const scrollHandler = () => testData.scrollEvents++;
+            
+            document.addEventListener('mousemove', mouseHandler);
+            document.addEventListener('click', clickHandler);
+            document.addEventListener('scroll', scrollHandler);
+            
+            setTimeout(() => {
+                document.removeEventListener('mousemove', mouseHandler);
+                document.removeEventListener('click', clickHandler);
+                document.removeEventListener('scroll', scrollHandler);
+                
+                let suspiciousScore = 0;
+                let findings = [];
+                
+                if (testData.mouseEvents === 0) {
+                    suspiciousScore += 50;
+                    findings.push('אין תנועת עכבר');
+                }
+                
+                if (testData.clickEvents > 10) {
+                    suspiciousScore += 30;
+                    findings.push('יותר מדי לחיצות');
+                }
+                
+                logAnalyticsEvent('advanced_behavior_test', {
+                    'suspicious_score': suspiciousScore,
+                    'findings': findings.join(';'),
+                    'mouse_events': testData.mouseEvents,
+                    'click_events': testData.clickEvents,
+                    'scroll_events': testData.scrollEvents
+                });
+                
+                let resultMessage = `תוצאות הבדיקה המתקדמת:\n`;
+                resultMessage += `ציון חשדנות: ${suspiciousScore}/100\n`;
+                resultMessage += `תנועות עכבר: ${testData.mouseEvents}\n`;
+                resultMessage += `לחיצות: ${testData.clickEvents}\n`;
+                resultMessage += `גלילות: ${testData.scrollEvents}`;
+                
+                alert(resultMessage);
+            }, 10000);
+        }
+        
+        // מעקב התנהגות מתקדם
+        function initBehaviorTracking() {
+            document.addEventListener('mousemove', (e) => {
+                behaviorAnalysis.mouseMovements.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+                
+                if (behaviorAnalysis.mouseMovements.length > 100) {
+                    behaviorAnalysis.mouseMovements.shift();
+                }
+            });
+            
+            document.addEventListener('click', (e) => {
+                behaviorAnalysis.clicks.push({
+                    x: e.clientX,
+                    y: e.clientY,
+                    timestamp: Date.now()
+                });
+            });
+            
+            setInterval(() => {
+                const now = Date.now();
+                const recentMovements = behaviorAnalysis.mouseMovements.filter(m => now - m.timestamp < 10000);
+                
+                if (recentMovements.length === 0 && behaviorAnalysis.clicks.length > 0) {
+                    logAnalyticsEvent('suspicious_behavior', {
+                        'patterns': 'לחיצות ללא תנועת עכבר',
+                        'mouse_movements': recentMovements.length,
+                        'clicks': behaviorAnalysis.clicks.length,
+                        'risk_score': 50
+                    });
+                }
+            }, 30000);
+        }
+        
+        // עדכון מטריקות
+        function updateMetrics() {
+            updateRealTimeStatsDisplay();
+        }
+        
+        // הפעלה אוטומטית
+        window.onload = async () => {
+            // ניתוח מקור הגעה
+            analyzeReferrer();
+            
+            // קריאת פרמטרי UTM
+            parseUTMParams();
+            
+            // הפעלת זיהוי מתקדם
+            try {
+                await initAdvancedDetection();
+            } catch (error) {
+                console.error('שגיאה בזיהוי מתקדם:', error);
+                detectBot(); // fallback
+            }
+            
+            // הפעלת מעקב התנהגות
+            initBehaviorTracking();
+            
+            // שליחת אירוע עמוד נטען למערכת שלנו
+            logAnalyticsEvent('page_view', {
+                'page_title': document.title,
+                'user_agent': navigator.userAgent,
+                'screen_resolution': screen.width + 'x' + screen.height,
+                'device_fingerprint': deviceFingerprint,
+                'referrer': document.referrer,
+                'utm_params': parseUTMParams()
+            });
+            
+            // עדכון סטטיסטיקות ראשוני
+            updateRealTimeStatsDisplay();
+            
+            // הוספה ראשונית לציר הזמן
+            addToTimeline('page_view', {page_title: document.title});
+            
+            console.log('🚀 מערכת זיהוי בוטים מתקדמת הופעלה בהצלחה!');
+        };
+    </script>
+</body>
+</html>
