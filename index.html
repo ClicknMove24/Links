@@ -4090,26 +4090,68 @@
                     </div>
                 </div>
 
-                <!-- ניתוח מסלול המרה -->
+                <!-- השוואת בוטים מול בני אדם -->
                 ${results.summary.totalClicks !== undefined && results.summary.totalNonClicks !== undefined ? `
-                <div style="background: rgba(33, 150, 243, 0.15); border: 1px solid #2196F3; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                    <h4 style="color: #2196F3; margin-bottom: 15px; text-align: center;">🔄 ניתוח מסלול לקוחות (Conversion Funnel)</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    
+                    <!-- ניתוח בוטים -->
+                    <div style="background: rgba(244, 67, 54, 0.15); border: 2px solid #F44336; padding: 20px; border-radius: 10px;">
+                        <h4 style="color: #F44336; margin-bottom: 15px; text-align: center;">🤖 פעילות בוטים (לא אמיתית)</h4>
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <div style="font-size: 2.5em; font-weight: bold; color: #F44336;">${results.summary.botCount.toLocaleString()}</div>
+                            <div style="color: #ccc;">סה"כ בוטים שזוהו</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="color: #FFB74D; font-weight: bold;">⚠️ נתונים אלה לא רלוונטיים לעסק</div>
+                            <div style="font-size: 0.9em; color: #ccc; margin-top: 5px;">
+                                בוטים לא קונים מוצרים ולא הופכים ללקוחות
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ניתוח אמיתי - רק בני אדם -->
+                    <div style="background: rgba(76, 175, 80, 0.15); border: 2px solid #4CAF50; padding: 20px; border-radius: 10px;">
+                        <h4 style="color: #4CAF50; margin-bottom: 15px; text-align: center;">👥 לקוחות פוטנציאליים אמיתיים</h4>
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <div style="font-size: 2.5em; font-weight: bold; color: #4CAF50;">${results.summary.humanCount.toLocaleString()}</div>
+                            <div style="color: #ccc;">בני אדם אמיתיים</div>
+                        </div>
+                        
+                        <!-- מסלול המרה אמיתי -->
+                        ${calculateRealConversionData(results.summary) ? `
+                        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 8px;">
+                            <div style="text-align: center; margin-bottom: 10px; color: #FFC107; font-weight: bold;">
+                                📈 שיעור המרה אמיתי: ${calculateRealConversionRate(results.summary)}%
+                            </div>
+                            <div style="font-size: 0.85em; color: #e0e0e0; text-align: center;">
+                                מתוך ${getHumanVisitors(results.summary)} מבקרים אמיתיים,<br>
+                                ${getHumanClicks(results.summary)} לחצו על WhatsApp/טלפון
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <!-- מסלול המרה מפורט - רק אנשים אמיתיים -->
+                <div style="background: rgba(33, 150, 243, 0.15); border: 2px solid #2196F3; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4 style="color: #2196F3; margin-bottom: 15px; text-align: center;">🔄 מסלול המרה - לקוחות אמיתיים בלבד</h4>
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
                         
-                        <!-- כניסות לעמוד -->
+                        <!-- אנשים אמיתיים שנכנסו -->
                         <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #90CAF9;">${(results.summary.totalClicks + results.summary.totalNonClicks).toLocaleString()}</div>
-                            <div style="font-size: 0.9em; opacity: 0.9;">👥 נכנסו לעמוד</div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #90CAF9;">${getHumanVisitors(results.summary)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.9;">👥 אנשים אמיתיים נכנסו</div>
+                            <div style="font-size: 0.8em; color: #81C784; margin-top: 5px;">🎯 לקוחות פוטנציאליים</div>
                         </div>
 
                         <!-- חץ -->
                         <div style="color: #FFC107; font-size: 2em;">→</div>
 
-                        <!-- ראו את התוכן -->
+                        <!-- צפו אבל עזבו -->
                         <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #FFB74D;">${results.summary.totalNonClicks.toLocaleString()}</div>
-                            <div style="font-size: 0.9em; opacity: 0.9;">👀 צפו בתוכן אבל עזבו</div>
-                            <div style="font-size: 0.8em; color: #FF7043; margin-top: 5px;">❌ לא לחצו על כלום</div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #FFB74D;">${getHumanNonClicks(results.summary)}</div>
+                            <div style="font-size: 0.9em; opacity: 0.9;">👀 צפו אבל עזבו</div>
+                            <div style="font-size: 0.8em; color: #FF7043; margin-top: 5px;">❌ הזדמנויות שהוחמצו</div>
                         </div>
 
                         <!-- חץ -->
@@ -4117,19 +4159,22 @@
 
                         <!-- לחצו על WhatsApp -->
                         <div style="flex: 1; min-width: 150px; text-align: center; padding: 15px; background: rgba(76, 175, 80, 0.2); border: 2px solid #4CAF50; border-radius: 8px;">
-                            <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${results.summary.totalClicks.toLocaleString()}</div>
-                            <div style="font-size: 0.9em; font-weight: bold;">✅ לחצו על WhatsApp/טלפון</div>
-                            <div style="font-size: 0.8em; color: #66BB6A; margin-top: 5px;">🎯 המירו ללקוחות!</div>
+                            <div style="font-size: 1.5em; font-weight: bold; color: #4CAF50;">${getHumanClicks(results.summary)}</div>
+                            <div style="font-size: 0.9em; font-weight: bold;">✅ לחצו על WhatsApp</div>
+                            <div style="font-size: 0.8em; color: #66BB6A; margin-top: 5px;">💰 הפכו ללידים!</div>
                         </div>
                     </div>
                     
-                    <!-- שיעור המרה -->
-                    <div style="margin-top: 20px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                        <div style="font-size: 1.2em; font-weight: bold; color: #FFC107;">
-                            📈 שיעור המרה: ${((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1)}%
+                    <!-- שיעור המרה אמיתי -->
+                    <div style="margin-top: 20px; text-align: center; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px; border: 2px solid #4CAF50;">
+                        <div style="font-size: 1.4em; font-weight: bold; color: #4CAF50;">
+                            🎯 שיעור המרה אמיתי: ${calculateRealConversionRate(results.summary)}%
                         </div>
-                        <div style="font-size: 0.9em; opacity: 0.8; margin-top: 5px;">
-                            מתוך כל מי שנכנס לעמוד, ${((results.summary.totalClicks / (results.summary.totalClicks + results.summary.totalNonClicks)) * 100).toFixed(1)}% באמת לחצו על WhatsApp/טלפון
+                        <div style="font-size: 1em; color: #81C784; margin-top: 5px; font-weight: bold;">
+                            מתוך ${getHumanVisitors(results.summary)} אנשים אמיתיים, ${getHumanClicks(results.summary)} הפכו ללידים
+                        </div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 8px; color: #e0e0e0;">
+                            (ללא בוטים - רק נתונים עסקיים רלוונטיים)
                         </div>
                     </div>
                 </div>
@@ -4395,6 +4440,36 @@
             summary += '🤖 מערכת זיהוי בוטים מתקדמת - נוצר אוטומטית\n';
 
             return summary;
+        }
+
+        // פונקציות עזר לחישוב נתונים אמיתיים (ללא בוטים)
+        function calculateRealConversionData(summary) {
+            return summary.totalClicks !== undefined && summary.totalNonClicks !== undefined && summary.humanCount > 0;
+        }
+
+        function calculateRealConversionRate(summary) {
+            const humanVisitors = getHumanVisitors(summary);
+            const humanClicks = getHumanClicks(summary);
+            
+            if (humanVisitors === 0) return '0.0';
+            return ((humanClicks / humanVisitors) * 100).toFixed(1);
+        }
+
+        function getHumanVisitors(summary) {
+            // מניח שכל הלקוחות האמיתיים הם בני אדם (humanCount כולל גם clicks וגם non-clicks)
+            return summary.humanCount || 0;
+        }
+
+        function getHumanClicks(summary) {
+            // מניח שכל הקליקים הם של בני אדם (בוטים בדרך כלל לא לוחצים על כפתורים אמיתיים)
+            return summary.totalClicks || 0;
+        }
+
+        function getHumanNonClicks(summary) {
+            // בני אדם שנכנסו אבל לא לחצו = סה"כ בני אדם מינוס הקליקים
+            const totalHumans = summary.humanCount || 0;
+            const humanClicks = getHumanClicks(summary);
+            return Math.max(0, totalHumans - humanClicks);
         }
 
         // הוספת סגנונות לטבלאות נפתחות
@@ -4779,36 +4854,43 @@
             return html;
         }
 
-        // ניתוח זמני שהייה ונטישה
+        // ניתוח זמני שהייה ונטישה - רק בני אדם אמיתיים
         function createAbandonmentAnalysis(results) {
             const summary = results.summary;
-            const abandonmentRate = summary.totalNonClicks && summary.totalClicks ? 
-                ((summary.totalNonClicks / (summary.totalNonClicks + summary.totalClicks)) * 100).toFixed(1) : 0;
+            
+            // חישוב נטישה אמיתית (רק בני אדם)
+            const humanVisitors = getHumanVisitors(summary);
+            const humanClicks = getHumanClicks(summary);
+            const humanNonClicks = getHumanNonClicks(summary);
+            const realAbandonmentRate = humanVisitors > 0 ? 
+                ((humanNonClicks / humanVisitors) * 100).toFixed(1) : 0;
             
             let html = `
                 <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px;">
-                    <h4 style="color: #FF5722; margin-bottom: 20px; text-align: center;">📊 ניתוח נטישה מפורט</h4>
+                    <h4 style="color: #FF5722; margin-bottom: 20px; text-align: center;">📊 ניתוח נטישה - לקוחות אמיתיים בלבד</h4>
                     
-                    <!-- סטטיסטיקות נטישה עיקריות -->
+                    <!-- התראה על נתונים אמיתיים -->
+                    <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                        <div style="color: #4CAF50; font-weight: bold; margin-bottom: 5px;">✅ ניתוח מבוסס רק על בני אדם אמיתיים</div>
+                        <div style="font-size: 0.9em; color: #e0e0e0;">בוטים לא נכללים בחישוב - רק נתונים עסקיים רלוונטיים</div>
+                    </div>
+                    
+                    <!-- סטטיסטיקות נטישה אמיתיות -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px;">
                         <div style="background: rgba(244, 67, 54, 0.1); border: 1px solid #F44336; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.8em; font-weight: bold; color: #F44336;">${abandonmentRate}%</div>
-                            <div style="color: #ccc; font-size: 0.9em;">שיעור נטישה</div>
+                            <div style="font-size: 1.8em; font-weight: bold; color: #F44336;">${realAbandonmentRate}%</div>
+                            <div style="color: #ccc; font-size: 0.9em;">שיעור נטישה אמיתי</div>
                         </div>
                         
-                        ${summary.totalNonClicks ? `
                         <div style="background: rgba(255, 152, 0, 0.1); border: 1px solid #FF9800; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.8em; font-weight: bold; color: #FF9800;">${summary.totalNonClicks}</div>
-                            <div style="color: #ccc; font-size: 0.9em;">עזבו ללא פעולה</div>
+                            <div style="font-size: 1.8em; font-weight: bold; color: #FF9800;">${humanNonClicks}</div>
+                            <div style="color: #ccc; font-size: 0.9em;">אנשים עזבו ללא פעולה</div>
                         </div>
-                        ` : ''}
                         
-                        ${summary.totalClicks ? `
                         <div style="background: rgba(76, 175, 80, 0.1); border: 1px solid #4CAF50; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 1.8em; font-weight: bold; color: #4CAF50;">${summary.totalClicks}</div>
-                            <div style="color: #ccc; font-size: 0.9em;">ביצעו פעולה</div>
+                            <div style="font-size: 1.8em; font-weight: bold; color: #4CAF50;">${humanClicks}</div>
+                            <div style="color: #ccc; font-size: 0.9em;">אנשים ביצעו פעולה</div>
                         </div>
-                        ` : ''}
                     </div>
 
                     <!-- ניתוח נקודות נטישה -->
@@ -4816,9 +4898,9 @@
                         <h5 style="color: #FFC107; margin-bottom: 15px;">🎯 נקודות נטישה עיקריות</h5>
                         <div style="text-align: right;">
                             <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
-                                <strong style="color: #FF7043;">📖 צפייה בתוכן בלבד:</strong> ${summary.totalNonClicks || 0} מבקרים
+                                <strong style="color: #FF7043;">📖 צפייה בתוכן בלבד:</strong> ${humanNonClicks} אנשים אמיתיים
                                 <div style="font-size: 0.85em; color: #ccc; margin-top: 5px;">
-                                    אנשים שקראו את התוכן אבל לא לחצו על כפתור WhatsApp/טלפון
+                                    לקוחות פוטנציאליים שקראו את התוכן אבל לא לחצו על כפתור WhatsApp/טלפון
                                 </div>
                             </div>
                             <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
@@ -4859,8 +4941,11 @@
                             <div>• שיעור המרה טיפוסי לעמודי נחיתה: 2-5%</div>
                             <div>• שיעור המרה טוב: 5-10%</div>
                             <div>• שיעור המרה מעולה: 10%+</div>
-                            <div style="margin-top: 10px; font-weight: bold; color: ${parseFloat(abandonmentRate) > 90 ? '#F44336' : parseFloat(abandonmentRate) > 85 ? '#FF9800' : '#4CAF50'};">
-                                השיעור שלך (${(100 - parseFloat(abandonmentRate)).toFixed(1)}%): ${parseFloat(abandonmentRate) > 90 ? 'נמוך - דורש שיפור' : parseFloat(abandonmentRate) > 85 ? 'בינוני' : 'טוב!'}
+                            <div style="margin-top: 10px; font-weight: bold; color: ${parseFloat(realAbandonmentRate) > 90 ? '#F44336' : parseFloat(realAbandonmentRate) > 85 ? '#FF9800' : '#4CAF50'};">
+                                השיעור שלך (${(100 - parseFloat(realAbandonmentRate)).toFixed(1)}%): ${parseFloat(realAbandonmentRate) > 90 ? 'נמוך - דורש שיפור' : parseFloat(realAbandonmentRate) > 85 ? 'בינוני' : 'טוב!'}
+                            </div>
+                            <div style="font-size: 0.8em; margin-top: 5px; color: #66BB6A;">
+                                (מבוסס על ${humanVisitors} לקוחות אמיתיים - ללא בוטים)
                             </div>
                         </div>
                     </div>
