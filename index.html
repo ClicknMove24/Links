@@ -2607,32 +2607,55 @@
             const dataStructure = identifyDataStructure(logs);
             
             // ניתוח על פי מבנה הנתונים
-            if (dataStructure.type === 'array') {
+            if (dataStructure.type === 'complex_phone_logs') {
+                return analyzeComplexPhoneLogs(logs, dataStructure);
+            } else if (dataStructure.type === 'simple_array') {
                 return analyzeArrayLogs(logs, dataStructure);
             } else if (dataStructure.type === 'object') {
                 return analyzeObjectLogs(logs, dataStructure);
             } else {
-                throw new Error('מבנה נתונים לא נתמך');
+                throw new Error(`מבנה נתונים לא נתמך: ${dataStructure.type}`);
             }
         }
 
-        // זיהוי מבנה הנתונים
+        // זיהוי מבנה הנתונים המתקדם
         function identifyDataStructure(data) {
+            console.log('🔍 Analyzing data structure:', data);
+            
             if (Array.isArray(data)) {
+                // בדיקה אם זה מערך של אובייקטים מורכבים (כמו הדוגמה שלך)
                 if (data.length > 0) {
                     const sample = data[0];
+                    const hasClicks = sample.clicks && Array.isArray(sample.clicks);
+                    const hasNonClickRequests = sample.non_click_requests && Array.isArray(sample.non_click_requests);
+                    const hasPhoneNumber = sample.phone_number;
+                    
+                    if (hasClicks || hasNonClickRequests || hasPhoneNumber) {
+                        return {
+                            type: 'complex_phone_logs',
+                            sampleKeys: Object.keys(sample),
+                            length: data.length,
+                            hasClicks: hasClicks,
+                            hasNonClickRequests: hasNonClickRequests,
+                            hasPhoneNumber: hasPhoneNumber
+                        };
+                    }
+                    
                     return {
-                        type: 'array',
+                        type: 'simple_array',
                         sampleKeys: Object.keys(sample),
                         length: data.length
                     };
                 }
-                return { type: 'array', length: 0 };
-            } else if (typeof data === 'object') {
+                return { type: 'empty_array', length: 0 };
+            } else if (typeof data === 'object' && data !== null) {
+                const keys = Object.keys(data);
                 return {
                     type: 'object',
-                    keys: Object.keys(data),
-                    hasEvents: data.events && Array.isArray(data.events)
+                    keys: keys,
+                    hasEvents: data.events && Array.isArray(data.events),
+                    hasClicks: data.clicks && Array.isArray(data.clicks),
+                    hasNonClickRequests: data.non_click_requests && Array.isArray(data.non_click_requests)
                 };
             }
             return { type: 'unknown' };
@@ -2830,6 +2853,249 @@
             }
 
             return result;
+        }
+
+        // ניתוח לוגים מורכבים לפי מספר טלפון
+        function analyzeComplexPhoneLogs(logs, structure) {
+            console.log('📱 Analyzing complex phone logs...', logs);
+            
+            let totalBots = 0;
+            let totalHumans = 0; 
+            let totalClicks = 0;
+            let totalNonClicks = 0;
+            let phoneNumbers = new Set();
+            let suspiciousActivities = 0;
+            
+            const ipAnalysis = {};
+            const timeDistribution = {};
+            const sourceAnalysis = {};
+            const phoneNumberStats = {};
+            const clickDestinations = {};
+            
+            logs.forEach((phoneEntry, phoneIndex) => {
+                try {
+                    const phoneNumber = phoneEntry.phone_number;
+                    if (phoneNumber) {
+                        phoneNumbers.add(phoneNumber);
+                    }
+                    
+                    phoneNumberStats[phoneNumber] = {
+                        clicks: phoneEntry.clicks ? phoneEntry.clicks.length : 0,
+                        nonClicks: phoneEntry.non_click_requests ? phoneEntry.non_click_requests.length : 0,
+                        bots: 0,
+                        humans: 0,
+                        suspicious: 0
+                    };
+                    
+                    // ניתוח לחיצות
+                    if (phoneEntry.clicks && Array.isArray(phoneEntry.clicks)) {
+                        phoneEntry.clicks.forEach(click => {
+                            totalClicks++;
+                            const analysis = analyzeComplexLogEntry(click, 'click', phoneNumber);
+                            
+                            if (analysis.isBot) {
+                                totalBots++;
+                                phoneNumberStats[phoneNumber].bots++;
+                            } else {
+                                totalHumans++;
+                                phoneNumberStats[phoneNumber].humans++;
+                            }
+                            
+                            if (analysis.isSuspicious) {
+                                suspiciousActivities++;
+                                phoneNumberStats[phoneNumber].suspicious++;
+                            }
+                            
+                            // איסוף סטטיסטיקות
+                            if (click.destination) {
+                                clickDestinations[click.destination] = (clickDestinations[click.destination] || 0) + 1;
+                            }
+                            
+                            collectAdvancedStats(analysis, ipAnalysis, timeDistribution, sourceAnalysis);
+                        });
+                    }
+                    
+                    // ניתוח בקשות ללא לחיצה
+                    if (phoneEntry.non_click_requests && Array.isArray(phoneEntry.non_click_requests)) {
+                        phoneEntry.non_click_requests.forEach(request => {
+                            totalNonClicks++;
+                            const analysis = analyzeComplexLogEntry(request, 'non_click', phoneNumber);
+                            
+                            if (analysis.isBot) {
+                                totalBots++;
+                                phoneNumberStats[phoneNumber].bots++;
+                            } else if (analysis.isHuman) {
+                                totalHumans++;
+                                phoneNumberStats[phoneNumber].humans++;
+                            }
+                            
+                            if (analysis.isSuspicious) {
+                                suspiciousActivities++;
+                                phoneNumberStats[phoneNumber].suspicious++;
+                            }
+                            
+                            collectAdvancedStats(analysis, ipAnalysis, timeDistribution, sourceAnalysis);
+                        });
+                    }
+                    
+                } catch (error) {
+                    console.warn(`Error analyzing phone entry ${phoneIndex}:`, error);
+                }
+            });
+            
+            const totalEntries = totalClicks + totalNonClicks;
+            const botRatio = totalEntries > 0 ? (totalBots / totalEntries * 100).toFixed(2) : 0;
+            const humanRatio = totalEntries > 0 ? (totalHumans / totalEntries * 100).toFixed(2) : 0;
+            
+            return {
+                summary: {
+                    totalPhoneNumbers: phoneNumbers.size,
+                    totalEntries: totalEntries,
+                    totalClicks: totalClicks,
+                    totalNonClicks: totalNonClicks,
+                    botCount: totalBots,
+                    humanCount: totalHumans,
+                    unknownCount: totalEntries - totalBots - totalHumans,
+                    botRatio: parseFloat(botRatio),
+                    humanRatio: parseFloat(humanRatio),
+                    suspiciousActivities: suspiciousActivities
+                },
+                phoneNumberStats: phoneNumberStats,
+                clickDestinations: clickDestinations,
+                ipAnalysis: ipAnalysis,
+                timeDistribution: timeDistribution,
+                sourceAnalysis: sourceAnalysis,
+                recommendations: generateAdvancedRecommendations(totalBots, totalHumans, totalEntries, phoneNumberStats)
+            };
+        }
+        
+        // ניתוח רשומת לוג מורכבת
+        function analyzeComplexLogEntry(entry, type, phoneNumber) {
+            const result = {
+                type: type,
+                phoneNumber: phoneNumber,
+                isBot: false,
+                isHuman: false,
+                isSuspicious: false,
+                detectionMethods: [],
+                confidence: 0,
+                ip: entry.ip_address,
+                timestamp: entry.timestamp,
+                source: null,
+                userAgent: null
+            };
+            
+            const ip = entry.ip_address;
+            let score = 0;
+            
+            // זיהוי בוטים על פי IP
+            if (ip) {
+                // Google Bots
+                if (ip.match(/^66\.249\./)) {
+                    result.isBot = true;
+                    result.detectionMethods.push('Google Bot IP');
+                    score += 100;
+                }
+                // Facebook Bots
+                else if (ip.match(/^(173\.252\.|69\.171\.|31\.13\.|66\.220\.149\.)/)) {
+                    result.isBot = true;
+                    result.detectionMethods.push('Facebook Bot IP');
+                    score += 100;
+                }
+                // ISP ישראלי - סביר שמשתמש אמיתי
+                else if (ip.match(/^(2\.54\.|5\.28\.|5\.29\.|77\.127\.|77\.137\.|79\.177\.|141\.226\.|188\.64\.|185\.164\.|192\.114\.|207\.232\.|217\.194\.)/)) {
+                    result.isHuman = true;
+                    result.detectionMethods.push('Israeli ISP');
+                    score += 70;
+                }
+            }
+            
+            // בדיקת referrer ו-fbclid
+            if (entry.referrer) {
+                result.source = entry.referrer;
+                if (entry.query_params && entry.query_params.fbclid) {
+                    result.detectionMethods.push('Facebook Click ID');
+                    if (!result.isBot) {
+                        result.isHuman = true;
+                        score += 60;
+                    }
+                }
+            } else if (!entry.referrer && !entry.query_params) {
+                // גישה ללא referrer וללא פרמטרים - חשוד
+                result.isSuspicious = true;
+                result.detectionMethods.push('No Referrer/Params');
+            }
+            
+            // בדיקת דפוס לחיצות
+            if (type === 'click' && entry.destination) {
+                result.detectionMethods.push(`Click to ${entry.destination}`);
+                if (!result.isBot) {
+                    result.isHuman = true;
+                    score += 50;
+                }
+            }
+            
+            result.confidence = Math.min(score, 100);
+            
+            return result;
+        }
+        
+        // איסוף סטטיסטיקות מתקדמות
+        function collectAdvancedStats(analysis, ipAnalysis, timeDistribution, sourceAnalysis) {
+            // ניתוח IP
+            if (analysis.ip) {
+                if (!ipAnalysis[analysis.ip]) {
+                    ipAnalysis[analysis.ip] = { count: 0, isBot: analysis.isBot, isHuman: analysis.isHuman };
+                }
+                ipAnalysis[analysis.ip].count++;
+            }
+            
+            // התפלגות זמנים
+            if (analysis.timestamp) {
+                try {
+                    const date = new Date(analysis.timestamp);
+                    const hour = date.getHours();
+                    timeDistribution[hour] = (timeDistribution[hour] || 0) + 1;
+                } catch (e) {
+                    console.warn('Invalid timestamp:', analysis.timestamp);
+                }
+            }
+            
+            // ניתוח מקורות
+            if (analysis.source) {
+                sourceAnalysis[analysis.source] = (sourceAnalysis[analysis.source] || 0) + 1;
+            }
+        }
+        
+        // יצירת המלצות מתקדמות
+        function generateAdvancedRecommendations(botCount, humanCount, totalEntries, phoneStats) {
+            const recommendations = [];
+            const botRatio = totalEntries > 0 ? botCount / totalEntries : 0;
+            
+            if (botRatio > 0.7) {
+                recommendations.push('🚨 רמת בוטים קריטית (>70%) - חקירה מיידית נדרשת');
+                recommendations.push('🛡️ הטמעת CAPTCHA ומערכת הגנה מתקדמת');
+            } else if (botRatio > 0.5) {
+                recommendations.push('⚠️ רמת בוטים גבוהה (>50%) - נדרש שיפור מערכת ההגנה');
+            } else if (botRatio > 0.3) {
+                recommendations.push('📊 רמת בוטים בינונית (>30%) - מעקב רציף נדרש');
+            } else {
+                recommendations.push('✅ רמת בוטים תקינה (<30%)');
+            }
+            
+            // המלצות לפי מספרי טלפון
+            const phoneNumbers = Object.keys(phoneStats);
+            const highBotPhones = phoneNumbers.filter(phone => {
+                const stats = phoneStats[phone];
+                const total = stats.clicks + stats.nonClicks;
+                return total > 0 && (stats.bots / total) > 0.8;
+            });
+            
+            if (highBotPhones.length > 0) {
+                recommendations.push(`📞 זוהו ${highBotPhones.length} מספרי טלפון עם רמת בוטים גבוהה - בדיקה נדרשת`);
+            }
+            
+            return recommendations;
         }
 
         // יצירת המלצות
